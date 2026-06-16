@@ -1,0 +1,101 @@
+{%- comment -%}
+  CartElevate — App Embed Block
+  ─────────────────────────────────────────────────────
+  Activated ONCE by the merchant in:
+  Theme Editor → Customize → App Embeds → CartElevate → ON
+
+  The {% schema %} below:
+  - Declares this as an App Embed (target: body)
+  - Tells Shopify to auto-load cart-elevate.js + cart-elevate.css
+  - Makes it appear under "App Embeds" in the Theme Editor
+
+  The Liquid below:
+  - Injects the React mount point into the merchant's cart
+  - Uses MutationObserver to handle dynamic cart drawers
+  - Does NOT render any cart UI — only the #cart-elevate-root div
+{%- endcomment -%}
+
+<div
+  id="cart-elevate-app-embed"
+  data-shop="{{ shop.permanent_domain }}"
+  data-currency="{{ cart.currency }}"
+  data-theme="{{ shop.metafields.cart_elevate.settings.value.selectedTheme | default: 'dynamic' }}"
+  style="display:none;"
+  aria-hidden="true"
+></div>
+
+<script>
+  window.CartElevateSettings = {% if shop.metafields.cart_elevate.settings.value != blank %}{{ shop.metafields.cart_elevate.settings.value | json }}{% else %}null{% endif %};
+</script>
+
+<script>
+(function () {
+  'use strict';
+
+  var MOUNT_ID = 'cart-elevate-root';
+
+  /**
+   * Common cart container selectors across popular Shopify themes.
+   * CartElevate injects its mount point as the FIRST child of whichever
+   * selector matches — putting the Progress Bar at the top of the cart.
+   *
+   * Add your theme's cart selector here if needed.
+   */
+  var CART_SELECTORS = [
+    '[data-cart-drawer-content]',
+    '[data-cart-content]',
+    '.cart-drawer__content',
+    '.cart__content',
+    '#cart-drawer-content',
+    '#CartDrawer-CartItems',
+    '.CartDrawer__Content',
+    '.cart-drawer .cart-items',
+    '.drawer__inner-empty',
+    '.js-drawer-content',
+    '[data-section-type="cart-drawer"]',
+    'cart-drawer-items',
+    '.cart-items'
+  ];
+
+  function createMountPoint() {
+    var el = document.createElement('div');
+    el.id = MOUNT_ID;
+    return el;
+  }
+
+  function findCartContainer() {
+    for (var i = 0; i < CART_SELECTORS.length; i++) {
+      var el = document.querySelector(CART_SELECTORS[i]);
+      if (el) return el;
+    }
+    return null;
+  }
+
+  function injectMountPoint() {
+    if (document.getElementById(MOUNT_ID)) return;
+    var container = findCartContainer();
+    if (!container) return;
+    container.insertBefore(createMountPoint(), container.firstChild);
+  }
+
+  // Watch for cart drawer to open (themes render it dynamically)
+  var observer = new MutationObserver(injectMountPoint);
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectMountPoint);
+  } else {
+    injectMountPoint();
+  }
+})();
+</script>
+
+{% schema %}
+{
+  "name": "CartElevate",
+  "target": "body",
+  "javascript": "cart-elevate.js",
+  "stylesheet": "cart-elevate.css",
+  "settings": []
+}
+{% endschema %}

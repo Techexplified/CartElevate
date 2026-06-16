@@ -1,0 +1,80 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+model Settings {
+  shop                   String   @id
+  isEnabled              Boolean  @default(false) @map("is_enabled")
+  selectedTheme          String   @default("dynamic") @map("selected_theme")
+  selectedToggle         String   @default("none") @map("selected_toggle")
+  packageProtectionPrice Decimal  @default(2.99) @map("package_protection_price") @db.Decimal(10, 2)
+  giftWrappingPrice      Decimal  @default(4.99) @map("gift_wrapping_price") @db.Decimal(10, 2)
+  goals                  Json     @default("[]")
+  upsellProducts         Json     @default("[]") @map("upsell_products")
+  currencySymbol         String   @default("$") @map("currency_symbol")
+  updatedAt              DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+model AnalyticsEvent {
+  id              BigInt   @id @default(autoincrement())
+  shop            String   @map("shop")
+  cartToken       String   @map("cart_token")
+  eventType       String   @map("event_type")
+  targetVariantId String?  @map("target_variant_id")
+  value           Decimal  @default(0.00) @map("value") @db.Decimal(10, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([shop])
+  @@index([cartToken])
+  @@map("analytics_events")
+}
+
+model ConvertedOrder {
+  orderId          String   @id @map("order_id")
+  shop             String   @map("shop")
+  cartToken        String?  @map("cart_token")
+  totalOrderValue  Decimal  @map("total_order_value") @db.Decimal(10, 2)
+  elevatedRevenue  Decimal  @default(0.00) @map("elevated_revenue") @db.Decimal(10, 2)
+  hasUpsell        Boolean  @default(false) @map("has_upsell")
+  hasProtection    Boolean  @default(false) @map("has_protection")
+  hasGiftWrap      Boolean  @default(false) @map("has_gift_wrap")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([shop])
+  @@index([cartToken])
+  @@map("converted_orders")
+}
+
