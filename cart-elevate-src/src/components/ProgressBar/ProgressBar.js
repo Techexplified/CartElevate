@@ -60,13 +60,15 @@ export function ProgressBar({ tier }) {
           const isUnlocked = cartTotal >= t.goal;
           const positionPercent = (t.goal / maxGoal) * 100;
           const isLast = index === sortedTiers.length - 1;
+          const isEven = index % 2 === 0;
+          const labelClass = `ce-milestone-label${isLast ? ' is-last' : ''}${!isEven ? ' label-below' : ' label-above'}`;
           return (
             <div
               key={t.id}
               className={`ce-progress-milestone${isUnlocked ? ' unlocked' : ''}`}
               style={{ left: `${positionPercent}%` }}
             >
-              <span className={`ce-milestone-label${isLast ? ' is-last' : ''}`}>{t.rewardLabel}</span>
+              <span className={labelClass}>{t.rewardLabel}</span>
               <div className="ce-milestone-dot">
                 <span className="ce-milestone-check">✓</span>
               </div>
