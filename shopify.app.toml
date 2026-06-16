@@ -2,7 +2,7 @@
 
 client_id = "91e88f51d9ec392df7f5a047d343c716"
 name = "CartElevate"
-application_url = "https://example.com"
+application_url = "https://cart-elevate.vercel.app"
 embedded = true
 
 [access_scopes]
@@ -49,7 +49,7 @@ api_version = "2026-07"
   topics = [ "orders/create" ]
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://cart-elevate.vercel.app/api/auth" ]
 
 [build]
 automatically_update_urls_on_dev = true
