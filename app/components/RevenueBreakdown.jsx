@@ -35,6 +35,9 @@ export default function RevenueBreakdown({ data }) {
   const selectedLabel =
     revenueFilterOptions.find((o) => o.value === filter)?.label ?? "By Revenue";
 
+  // Dynamic filter view data selection
+  const viewData = data.views?.[filter] || data;
+
   return (
     <section className="analytics-card" aria-labelledby="revenue-breakdown-title">
       {/* Card header */}
@@ -72,15 +75,15 @@ export default function RevenueBreakdown({ data }) {
         {/* Donut chart */}
         <div className="flex-shrink-0 flex justify-center sm:justify-start">
           <DonutChart
-            sources={data.sources}
-            centerLabel={data.totalLabel}
-            centerSubLabel={data.totalSubLabel}
+            sources={viewData.sources}
+            centerLabel={viewData.totalLabel}
+            centerSubLabel={viewData.totalSubLabel}
           />
         </div>
 
         {/* Revenue source list */}
         <div className="flex-1 min-w-0">
-          {data.sources.map((source) => (
+          {viewData.sources.map((source) => (
             <RevenueSourceRow key={source.id} {...source} />
           ))}
         </div>
