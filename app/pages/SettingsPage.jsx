@@ -556,38 +556,9 @@ export default function SettingsPage({ shop: propShop, initialAppEnabled = false
                       
                       {/* Floating checklist */}
                       <div className="absolute left-0 right-0 bottom-full mb-1 z-20 border border-gray-300 rounded-lg p-4 bg-white max-h-64 overflow-y-auto space-y-4 shadow-lg">
-                        {/* Mock Products Group */}
-                        <div className="space-y-2">
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Mock Products</p>
-                          {[
-                            { id: "upsell-1", title: "Minimalist Leather Wallet" },
-                            { id: "upsell-2", title: "Ceramic Travel Mug" },
-                            { id: "upsell-3", title: "Wool Knit Phone Case" }
-                          ].map((prod) => {
-                            const isChecked = upsellProducts.includes(prod.id);
-                            return (
-                              <label key={prod.id} className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setUpsellProducts([...upsellProducts, prod.id]);
-                                    } else {
-                                      setUpsellProducts(upsellProducts.filter((id) => id !== prod.id));
-                                    }
-                                  }}
-                                  className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 h-4 w-4"
-                                />
-                                <span className="text-sm font-semibold text-gray-700">{prod.title}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-
                         {/* Store Products Group */}
                         {products && products.length > 0 && (
-                          <div className="space-y-2 pt-3 border-t border-gray-100">
+                          <div className="space-y-2">
                             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Store Products</p>
                             {products.map((prod) => {
                               const isChecked = upsellProducts.includes(prod.id);
@@ -846,24 +817,29 @@ export default function SettingsPage({ shop: propShop, initialAppEnabled = false
                     />
                   </button>
                 </div>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Set Price"
-                    value={tempPPEnabled ? tempPPPrice : ""}
-                    disabled={!tempPPEnabled}
-                    onChange={(e) => setTempPPPrice(e.target.value)}
-                    className={`w-full border rounded-lg p-2.5 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 ${
-                      !tempPPEnabled
-                        ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                        : "bg-white text-gray-700 border-gray-300"
-                    }`}
-                  />
-                  {!tempPPEnabled && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-red-500">
-                      Cannot Set Price
-                    </span>
-                  )}
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1.5">
+                    Enter Price Amount
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Set Price"
+                      value={tempPPEnabled ? tempPPPrice : ""}
+                      disabled={!tempPPEnabled}
+                      onChange={(e) => setTempPPPrice(e.target.value)}
+                      className={`w-full border rounded-lg p-2.5 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 ${
+                        !tempPPEnabled
+                          ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                          : "bg-white text-gray-700 border-gray-300"
+                      }`}
+                    />
+                    {!tempPPEnabled && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-red-500">
+                        Cannot Set Price
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -889,24 +865,29 @@ export default function SettingsPage({ shop: propShop, initialAppEnabled = false
                     />
                   </button>
                 </div>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Set Price"
-                    value={tempGWEnabled ? tempGWPrice : ""}
-                    disabled={!tempGWEnabled}
-                    onChange={(e) => setTempGWPrice(e.target.value)}
-                    className={`w-full border rounded-lg p-2.5 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 ${
-                      !tempGWEnabled
-                        ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                        : "bg-white text-gray-700 border-gray-300"
-                    }`}
-                  />
-                  {!tempGWEnabled && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-red-500">
-                      Cannot Set Price
-                    </span>
-                  )}
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1.5">
+                    Enter Price Amount
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Set Price"
+                      value={tempGWEnabled ? tempGWPrice : ""}
+                      disabled={!tempGWEnabled}
+                      onChange={(e) => setTempGWPrice(e.target.value)}
+                      className={`w-full border rounded-lg p-2.5 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 ${
+                        !tempGWEnabled
+                          ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                          : "bg-white text-gray-700 border-gray-300"
+                      }`}
+                    />
+                    {!tempGWEnabled && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-red-500">
+                        Cannot Set Price
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
