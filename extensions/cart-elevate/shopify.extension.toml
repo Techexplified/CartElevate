@@ -10,8 +10,3 @@ name = "CartElevate"
 handle = "cart-elevate"
 uid = "88294ee2-0775-d45d-3dba-ca279b729312e1ae400b"
 
-[extensions.build]
-# Build command runs from this extension directory (extensions/cart-elevate/)
-# ../../cart-elevate-src/ is the React source directory
-command = "npm --prefix ../../cart-elevate-src run build"
-watch_dirs = []

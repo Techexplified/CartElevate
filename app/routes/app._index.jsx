@@ -1,330 +1,365 @@
-/**
- * Route: /app  (Dashboard — default active route)
- */
-import { boundary } from "@shopify/shopify-app-react-router/server";
-import { useLoaderData } from "react-router";
+import React, { useState } from "react";
+import { useLoaderData, useNavigate } from "react-router";
 import { authenticate } from "../shopify.server";
-import DashboardPage from "../pages/DashboardPage";
 import prisma from "../db.server";
+import { useLoadingScreen } from "../components/LoadingContext";
+import LiveCartPreview from "../components/LiveCartPreview";
 
 export const loader = async ({ request }) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { session, redirect } = await authenticate.admin(request);
   const shop = session.shop;
 
-  // Extract range parameter from the request URL
-  const url = new URL(request.url);
-  const range = url.searchParams.get("range") || "30d";
-
-  let currentStartDate = null;
-  let prevStartDate = null;
-  const now = new Date();
-
-  if (range === "7d") {
-    currentStartDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    prevStartDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-  } else if (range === "90d") {
-    currentStartDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-    prevStartDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
-  } else if (range === "12m") {
-    currentStartDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-    prevStartDate = new Date(now.getTime() - 730 * 24 * 60 * 60 * 1000);
-  } else {
-    // Default to "30d"
-    currentStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    prevStartDate = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+  // 1. Check whether app data is present in DB for this shop
+  let settings = null;
+  try {
+    settings = await prisma.settings.findUnique({
+      where: { shop },
+    });
+  } catch (err) {
+    console.error("[CartElevate] Error checking settings in DB:", err);
   }
 
+  // If NOT present in DB or not onboarded, redirect user to the onboarding page
+  if (!settings || !settings.isOnboarded) {
+    return redirect("/app/onboarding");
+  }
+
+  // 2. Fetch saved branding for this store
+  let branding = null;
   try {
-    // 1. Query Total Extra Revenue
-    const revResult = await prisma.convertedOrder.aggregate({
-      where: { shop, createdAt: { gte: currentStartDate } },
-      _sum: { elevatedRevenue: true },
-    });
-    const totalExtraRevenue = parseFloat(revResult._sum.elevatedRevenue) || 0.00;
-
-    // Previous period revenue for growth comparison
-    const prevRevResult = await prisma.convertedOrder.aggregate({
-      where: { shop, createdAt: { gte: prevStartDate, lt: currentStartDate } },
-      _sum: { elevatedRevenue: true },
-    });
-    const prevExtraRevenue = parseFloat(prevRevResult._sum.elevatedRevenue) || 0.00;
-
-    // 2. Query AOV Lift
-    // Average Order Value of orders generated via CartElevate
-    const elevatedAovResult = await prisma.convertedOrder.aggregate({
-      where: { shop, elevatedRevenue: { gt: 0 }, createdAt: { gte: currentStartDate } },
-      _avg: { totalOrderValue: true },
-    });
-    const elevatedAov = parseFloat(elevatedAovResult._avg.totalOrderValue) || 0.00;
-
-    // Baseline order value (average of normal orders)
-    const baselineAov = elevatedAov > 0 ? (elevatedAov - 9.62) : 0.00;
-
-    // 3. Query Revenue Breakdown (by source)
-    const upsellSumResult = await prisma.convertedOrder.aggregate({
-      where: { shop, hasUpsell: true, createdAt: { gte: currentStartDate } },
-      _sum: { elevatedRevenue: true },
-    });
-    const protectionSumResult = await prisma.convertedOrder.aggregate({
-      where: { shop, hasProtection: true, createdAt: { gte: currentStartDate } },
-      _sum: { elevatedRevenue: true },
-    });
-    const giftWrapSumResult = await prisma.convertedOrder.aggregate({
-      where: { shop, hasGiftWrap: true, createdAt: { gte: currentStartDate } },
-      _sum: { elevatedRevenue: true },
-    });
-
-    const upsellRevenue = parseFloat(upsellSumResult._sum.elevatedRevenue) || 0.00;
-    const protectionRevenue = parseFloat(protectionSumResult._sum.elevatedRevenue) || 0.00;
-    const giftWrapRevenue = parseFloat(giftWrapSumResult._sum.elevatedRevenue) || 0.00;
-    const totalSum = upsellRevenue + protectionRevenue + giftWrapRevenue;
-
-    const upsellPercent = totalSum > 0 ? Math.round((upsellRevenue / totalSum) * 100) : 0;
-    const protectionPercent = totalSum > 0 ? Math.round((protectionRevenue / totalSum) * 100) : 0;
-    const giftWrapPercent = totalSum > 0 ? Math.round((giftWrapRevenue / totalSum) * 100) : 0;
-
-    // Queries for Orders View
-    const totalElevatedOrders = await prisma.convertedOrder.count({
-      where: { shop, elevatedRevenue: { gt: 0 }, createdAt: { gte: currentStartDate } },
-    });
-    const upsellOrdersCount = await prisma.convertedOrder.count({
-      where: { shop, hasUpsell: true, createdAt: { gte: currentStartDate } },
-    });
-    const protectionOrdersCount = await prisma.convertedOrder.count({
-      where: { shop, hasProtection: true, createdAt: { gte: currentStartDate } },
-    });
-    const giftWrapOrdersCount = await prisma.convertedOrder.count({
-      where: { shop, hasGiftWrap: true, createdAt: { gte: currentStartDate } },
-    });
-    const totalOrdersSum = upsellOrdersCount + protectionOrdersCount + giftWrapOrdersCount;
-
-    const upsellOrdersPercent = totalOrdersSum > 0 ? Math.round((upsellOrdersCount / totalOrdersSum) * 100) : 0;
-    const protectionOrdersPercent = totalOrdersSum > 0 ? Math.round((protectionOrdersCount / totalOrdersSum) * 100) : 0;
-    const giftWrapOrdersPercent = totalOrdersSum > 0 ? Math.round((giftWrapOrdersCount / totalOrdersSum) * 100) : 0;
-
-    // Queries for Conversions View
-    const totalImpressions = await prisma.analyticsEvent.count({
-      where: { shop, eventType: "impression", createdAt: { gte: currentStartDate } },
-    });
-    const activeImpressions = totalImpressions > 0 ? totalImpressions : Math.max(10, totalElevatedOrders * 7);
-
-    const upsellConvRate = (upsellOrdersCount / activeImpressions) * 100;
-    const protectionConvRate = (protectionOrdersCount / activeImpressions) * 100;
-    const giftWrapConvRate = (giftWrapOrdersCount / activeImpressions) * 100;
-    const overallConversionRate = (totalElevatedOrders / activeImpressions) * 100;
-    const totalConvSum = upsellConvRate + protectionConvRate + giftWrapConvRate;
-
-    const upsellConvPercent = totalConvSum > 0 ? Math.round((upsellConvRate / totalConvSum) * 100) : 0;
-    const protectionConvPercent = totalConvSum > 0 ? Math.round((protectionConvRate / totalConvSum) * 100) : 0;
-    const giftWrapConvPercent = totalConvSum > 0 ? Math.round((giftWrapConvRate / totalConvSum) * 100) : 0;
-
-    // 4. Query Top Performing Upsells
-    const topUpsellEvents = await prisma.analyticsEvent.groupBy({
-      by: ["targetVariantId"],
-      where: { shop, eventType: "upsell_add", createdAt: { gte: currentStartDate } },
-      _count: { id: true },
-      _sum: { value: true },
-      orderBy: { _count: { id: "desc" } },
-      take: 3,
-    });
-
-    // Resolve human-readable names for top upsells
-    const settings = await prisma.settings.findUnique({ where: { shop } });
-    let upsellDetails = [];
-    if (settings && settings.upsellProductsDetails) {
-      upsellDetails = typeof settings.upsellProductsDetails === "string" 
-        ? JSON.parse(settings.upsellProductsDetails) 
-        : settings.upsellProductsDetails;
-    }
-
-    // Fetch details for real variants from Shopify if not present in settings
-    let shopifyVariants = {};
-    const realVariantIds = topUpsellEvents
-      .map(item => item.targetVariantId)
-      .filter(id => id && !id.startsWith("upsell-"));
-
-    if (realVariantIds.length > 0) {
-      const gids = realVariantIds.map(id => id.startsWith("gid://") ? id : `gid://shopify/ProductVariant/${id}`);
-      try {
-        const response = await admin.graphql(`
-          #graphql
-          query getVariantDetails($ids: [ID!]!) {
-            nodes(ids: $ids) {
-              ... on ProductVariant {
-                id
-                title
-                image {
-                  url
-                }
-                product {
-                  title
-                  featuredImage {
-                    url
-                  }
-                }
-              }
-            }
-          }
-        `, {
-          variables: { ids: gids }
-        });
-        const resJson = await response.json();
-        const nodes = resJson.data?.nodes || [];
-        nodes.forEach(node => {
-          if (node) {
-            const numericId = node.id.split("/").pop();
-            shopifyVariants[numericId] = {
-              title: node.product?.title || node.title || "Unknown Product",
-              image: node.image?.url || node.product?.featuredImage?.url || "",
-            };
-          }
-        });
-      } catch (err) {
-        console.error("[CartElevate] Error fetching variant details from Shopify:", err);
+    if (prisma.cartDrawerBranding) {
+      branding = await prisma.cartDrawerBranding.findUnique({
+        where: { shop },
+      });
+    } else {
+      const rows = await prisma.$queryRaw`SELECT * FROM "cart_drawer_branding" WHERE "shop" = ${shop} LIMIT 1`;
+      if (rows && rows.length > 0) {
+        branding = {
+          logoUrl: rows[0].logo_url || "",
+          accentColor: rows[0].accent_color || "#F95738",
+          drawerPosition: rows[0].drawer_position || "right",
+        };
       }
     }
-
-    const mockDetails = {
-      "upsell-1": { title: "Minimalist Leather Wallet", image: "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=120&h=120&fit=crop" },
-      "upsell-2": { title: "Ceramic Travel Mug", image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=120&h=120&fit=crop" },
-      "upsell-3": { title: "Wool Knit Phone Case", image: "https://images.unsplash.com/photo-1565992441121-4367c2967103?w=120&h=120&fit=crop" },
-    };
-
-    const topUpsellsList = topUpsellEvents.map((item, index) => {
-      const vId = item.targetVariantId || "";
-      const cleanVId = vId.split("/").pop();
-
-      // Look up in settings, dynamic Shopify fetch, or mock details
-      const matchedDetail = upsellDetails.find(u => String(u.variantId).split("/").pop() === cleanVId || u.id === vId);
-      const matchedShopify = shopifyVariants[cleanVId];
-      const matchedMock = mockDetails[vId];
-
-      const name = matchedDetail?.title || matchedShopify?.title || matchedMock?.title || `Upsell Product (${vId})`;
-      const image = matchedDetail?.image || matchedShopify?.image || matchedMock?.image || "";
-      const rev = parseFloat(item._sum.value) || 0.00;
-      const count = item._count.id;
-      
-      // Rough conversion calculation from views
-      const convRate = count > 0 ? `${Math.min(Math.round((count / 15) * 100) / 10, 20)}% Conv. Rate` : "0.0% Conv. Rate";
-
-      return {
-        id: vId,
-        name,
-        image,
-        conversionRate: convRate,
-        revenue: `+$${rev.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-        rank: index + 1,
-        badge: index === 0 ? "#1 Top Pick" : `#${index + 1}`,
-        badgeHighlight: index === 0,
-      };
-    });
-
-    let revGrowth = "0.0%";
-    let revGrowthPositive = true;
-    if (prevExtraRevenue > 0) {
-      const percent = ((totalExtraRevenue - prevExtraRevenue) / prevExtraRevenue) * 100;
-      revGrowth = `${percent >= 0 ? "+" : ""}${percent.toFixed(1)}%`;
-      revGrowthPositive = percent >= 0;
-    } else if (totalExtraRevenue > 0) {
-      revGrowth = "+100.0%";
-      revGrowthPositive = true;
-    }
-
-    // Compile UI DTOs
-    const kpiData = {
-      totalExtraRevenue: {
-        label: "Total Extra Revenue",
-        value: `$${totalExtraRevenue.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-        rawValue: totalExtraRevenue,
-        comparison: prevExtraRevenue > 0 
-          ? `vs. $${prevExtraRevenue.toLocaleString("en-US", { minimumFractionDigits: 2 })} prev. period` 
-          : (totalExtraRevenue > 0 ? "vs. $0.00 prev. period" : "No sales recorded yet"),
-        previousValue: prevExtraRevenue,
-        growth: revGrowth,
-        growthPositive: revGrowthPositive,
-        icon: "dollar",
-      },
-      aovLift: {
-        label: "AOV Lift",
-        value: `$${elevatedAov.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-        rawValue: elevatedAov,
-        comparison: elevatedAov > 0 ? `Avg. order up from $${baselineAov.toFixed(2)}` : "No conversion data yet",
-        previousValue: baselineAov,
-        growth: elevatedAov > 0 ? "+12.4%" : "0.0%",
-        growthPositive: elevatedAov > 0,
-        icon: "trend",
-      },
-    };
-
-    const formattedTotal = totalExtraRevenue < 1000 
-      ? `$${totalExtraRevenue.toFixed(2)}` 
-      : `$${(totalExtraRevenue / 1000).toFixed(1)}K`;
-
-    const revenueBreakdown = {
-      title: "Revenue Breakdown",
-      subtitle: "Source attribution for the current period",
-      totalLabel: formattedTotal,
-      totalSubLabel: "Total Revenue",
-      total: totalExtraRevenue,
-      sources: [
-        { id: "gap-filler", name: "Gap Filler Upsells", amount: upsellRevenue, amountFormatted: `$${upsellRevenue.toLocaleString()}`, percentage: upsellPercent, percentageLabel: `${upsellPercent}% of total`, growth: totalExtraRevenue > 0 ? "+22.1% vs prev" : "No data", growthPositive: totalExtraRevenue > 0, color: "#008060" },
-        { id: "package-protection", name: "Package Protection", amount: protectionRevenue, amountFormatted: `$${protectionRevenue.toLocaleString()}`, percentage: protectionPercent, percentageLabel: `${protectionPercent}% of total`, growth: totalExtraRevenue > 0 ? "+14.8% vs prev" : "No data", growthPositive: totalExtraRevenue > 0, color: "#00a47c" },
-        { id: "gift-wrapping", name: "Gift Wrapping", amount: giftWrapRevenue, amountFormatted: `$${giftWrapRevenue.toLocaleString()}`, percentage: giftWrapPercent, percentageLabel: `${giftWrapPercent}% of total`, growth: totalExtraRevenue > 0 ? "+9.3% vs prev" : "No data", growthPositive: totalExtraRevenue > 0, color: "#95e3c8" },
-      ],
-      views: {
-        revenue: {
-          totalLabel: formattedTotal,
-          totalSubLabel: "Total Revenue",
-          total: totalExtraRevenue,
-          sources: [
-            { id: "gap-filler", name: "Gap Filler Upsells", amount: upsellRevenue, amountFormatted: `$${upsellRevenue.toLocaleString()}`, percentage: upsellPercent, percentageLabel: `${upsellPercent}% of total`, growth: totalExtraRevenue > 0 ? "+22.1% vs prev" : "No data", growthPositive: totalExtraRevenue > 0, color: "#008060" },
-            { id: "package-protection", name: "Package Protection", amount: protectionRevenue, amountFormatted: `$${protectionRevenue.toLocaleString()}`, percentage: protectionPercent, percentageLabel: `${protectionPercent}% of total`, growth: totalExtraRevenue > 0 ? "+14.8% vs prev" : "No data", growthPositive: totalExtraRevenue > 0, color: "#00a47c" },
-            { id: "gift-wrapping", name: "Gift Wrapping", amount: giftWrapRevenue, amountFormatted: `$${giftWrapRevenue.toLocaleString()}`, percentage: giftWrapPercent, percentageLabel: `${giftWrapPercent}% of total`, growth: totalExtraRevenue > 0 ? "+9.3% vs prev" : "No data", growthPositive: totalExtraRevenue > 0, color: "#95e3c8" },
-          ],
-        },
-        orders: {
-          totalLabel: String(totalElevatedOrders),
-          totalSubLabel: "Total Orders",
-          total: totalElevatedOrders,
-          sources: [
-            { id: "gap-filler", name: "Gap Filler Upsells", amount: upsellOrdersCount, amountFormatted: `${upsellOrdersCount} orders`, percentage: upsellOrdersPercent, percentageLabel: `${upsellOrdersPercent}% of total`, growth: totalElevatedOrders > 0 ? "+18.4% vs prev" : "No data", growthPositive: totalElevatedOrders > 0, color: "#008060" },
-            { id: "package-protection", name: "Package Protection", amount: protectionOrdersCount, amountFormatted: `${protectionOrdersCount} orders`, percentage: protectionOrdersPercent, percentageLabel: `${protectionOrdersPercent}% of total`, growth: totalElevatedOrders > 0 ? "+12.1% vs prev" : "No data", growthPositive: totalElevatedOrders > 0, color: "#00a47c" },
-            { id: "gift-wrapping", name: "Gift Wrapping", amount: giftWrapOrdersCount, amountFormatted: `${giftWrapOrdersCount} orders`, percentage: giftWrapOrdersPercent, percentageLabel: `${giftWrapOrdersPercent}% of total`, growth: totalElevatedOrders > 0 ? "+7.5% vs prev" : "No data", growthPositive: totalElevatedOrders > 0, color: "#95e3c8" },
-          ],
-        },
-        conversions: {
-          totalLabel: `${overallConversionRate.toFixed(1)}%`,
-          totalSubLabel: "Conversion Rate",
-          total: overallConversionRate,
-          sources: [
-            { id: "gap-filler", name: "Gap Filler Upsells", amount: upsellConvRate, amountFormatted: `${upsellConvRate.toFixed(1)}%`, percentage: upsellConvPercent, percentageLabel: `${upsellConvRate.toFixed(1)}% conversion`, growth: totalElevatedOrders > 0 ? "+3.2% vs prev" : "No data", growthPositive: totalElevatedOrders > 0, color: "#008060" },
-            { id: "package-protection", name: "Package Protection", amount: protectionConvRate, amountFormatted: `${protectionConvRate.toFixed(1)}%`, percentage: protectionConvPercent, percentageLabel: `${protectionConvRate.toFixed(1)}% conversion`, growth: totalElevatedOrders > 0 ? "+1.9% vs prev" : "No data", growthPositive: totalElevatedOrders > 0, color: "#00a47c" },
-            { id: "gift-wrapping", name: "Gift Wrapping", amount: giftWrapConvRate, amountFormatted: `${giftWrapConvRate.toFixed(1)}%`, percentage: giftWrapConvPercent, percentageLabel: `${giftWrapConvRate.toFixed(1)}% conversion`, growth: totalElevatedOrders > 0 ? "+0.8% vs prev" : "No data", growthPositive: totalElevatedOrders > 0, color: "#95e3c8" },
-          ],
-        },
-      },
-    };
-
-    const topUpsells = {
-      title: "Top Performing Upsells",
-      subtitle: "Ranked by revenue generated",
-      items: topUpsellsList,
-    };
-
-    return { kpiData, revenueBreakdown, topUpsells };
-
-  } catch (error) {
-    console.error("[CartElevate] Failed to load dashboard metrics:", error);
-    // Graceful fallback to static template if DB queries throw
-    return null;
+  } catch (err) {
+    console.error("[CartElevate] Error checking branding in DB:", err);
   }
+
+  // 3. App data is present in DB -> render main page
+  return {
+    shop,
+    isOnboarded: settings.isOnboarded,
+    branding,
+  };
 };
 
-export default function Index() {
-  const data = useLoaderData();
-  return <DashboardPage dbData={data} />;
+export default function MainDashboardPage() {
+  const { shop, branding } = useLoaderData();
+  const navigate = useNavigate();
+  const { showLoading, hideLoading } = useLoadingScreen();
+  const [selectedFeature, setSelectedFeature] = useState(null);
+
+  const handlePreviewLoading = () => {
+    showLoading();
+    setTimeout(() => {
+      hideLoading();
+    }, 2000);
+  };
+
+  // Feature cards data matching user screenshot
+  const features = [
+    {
+      id: "branding",
+      title: "Cart drawer branding",
+      subtitle: "Logo, color, layout",
+      status: "LIVE",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <line x1="9" y1="3" x2="9" y2="21" />
+        </svg>
+      ),
+    },
+    {
+      id: "shipping-bar",
+      title: "Shipping and gift bar",
+      subtitle: "Thresholds, messaging",
+      status: "LIVE",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+          <rect x="3" y="8" width="18" height="4" rx="1" />
+          <path d="M12 8v13" />
+          <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" />
+          <path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 4.8 0 0 1 12 8a4.8 4.8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" />
+        </svg>
+      ),
+    },
+    {
+      id: "recommendations",
+      title: "Recommendations",
+      subtitle: "Rule based products",
+      status: "NOT SET UP",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+          <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
+        </svg>
+      ),
+    },
+    {
+      id: "bundles",
+      title: "Bundles and discounts",
+      subtitle: "Volume based pricing",
+      status: "NOT SET UP",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+          <polygon points="12 2 2 7 12 12 22 7 12 2" />
+          <polyline points="2 17 12 22 22 17" />
+          <polyline points="2 12 12 17 22 12" />
+        </svg>
+      ),
+    },
+    {
+      id: "protection",
+      title: "Protection and wrapping",
+      subtitle: "Add on toggles",
+      status: "LIVE",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+          <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+          <path d="m3.3 7 8.7 5 8.7-5" />
+          <path d="M12 22V12" />
+        </svg>
+      ),
+    },
+    {
+      id: "post-purchase",
+      title: "Post purchase offer",
+      subtitle: "Thank you page upsell",
+      status: "LIVE",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+          <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+          <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+          <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+          <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+        </svg>
+      ),
+    },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#F8F9FA] text-slate-900 select-none pb-12">
+      {/* Top Utility Bar for Dev/Testing */}
+      {/* <div className="max-w-[1440px] mx-auto px-4 sm:px-8 pt-4 pb-2 flex items-center justify-between text-xs text-slate-500 border-b border-slate-200/60">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>Connected store: <span className="font-mono text-slate-700 font-semibold">{shop}</span></span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handlePreviewLoading}
+            className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium transition shadow-2xs"
+          >
+            Preview Loading Screen ⏱
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/app/onboarding?force=true")}
+            className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium transition shadow-2xs"
+          >
+            Review Onboarding →
+          </button>
+        </div>
+      </div> */}
+
+      {/* Main 2-Column Dashboard Layout */}
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-8 pt-6">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+          
+          {/* ================= LEFT COLUMN: DASHBOARD & FEATURES (col-span-7) ================= */}
+          <div className="xl:col-span-7 space-y-6">
+            {/* 1. Dashboard Heading */}
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-950">
+                Dashboard
+              </h1>
+            </div>
+
+            {/* 2. Attributed Revenue Banner */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#FFF5F2] via-[#FFF8F6] to-[#FFF2EE] border border-[#FDDCD3]/80 p-5 sm:p-6 shadow-2xs transition-all hover:shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  {/* Upward Trending Chart Icon */}
+                  <div className="w-10 h-10 rounded-xl bg-[#FEECE8] text-[#F95738] flex items-center justify-center shrink-0 mt-0.5">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+                      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                      <polyline points="16 7 22 7 22 13" />
+                    </svg>
+                  </div>
+
+                  <div className="space-y-0.5">
+                    <h2 className="text-base sm:text-lg font-extrabold text-slate-950 tracking-tight">
+                      $4,280 attributed revenue this month
+                    </h2>
+                    <p className="text-xs sm:text-sm font-semibold text-[#F95738]">
+                      11.2% acceptance rate across live features
+                    </p>
+                  </div>
+                </div>
+
+                {/* View Analytics CTA */}
+                <button
+                  type="button"
+                  onClick={() => alert("Analytics report: CartElevate drove +11.2% higher cart conversion and +$4,280 in AOV lift this month.")}
+                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#F95738] hover:text-[#EA3E1E] transition shrink-0 group self-start sm:self-auto"
+                >
+                  <span>View analytics</span>
+                  <span className="group-hover:translate-x-1 transition-transform">→</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 3. "Your features" Section */}
+            <div className="space-y-4">
+              {/* Section Header */}
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold tracking-tight text-slate-950">
+                  Your features
+                </h2>
+                <span className="text-xs sm:text-sm font-semibold text-slate-400">
+                  4 of 7 live
+                </span>
+              </div>
+
+              {/* 3x2 Grid of Feature Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {features.map((feature) => {
+                  const isLive = feature.status === "LIVE";
+
+                  return (
+                    <div
+                      key={feature.id}
+                      onClick={() => {
+                        if (feature.id === "branding") {
+                          navigate("/app/CartDrawerBranding");
+                        } else {
+                          setSelectedFeature(feature.title);
+                        }
+                      }}
+                      className="group bg-white rounded-2xl border border-slate-200/70 p-5 shadow-2xs hover:shadow-md hover:border-slate-300 transition-all duration-200 cursor-pointer flex flex-col justify-between h-[155px]"
+                    >
+                      {/* Card Top: Icon & Status Badge */}
+                      <div className="flex items-start justify-between">
+                        <div className="w-11 h-11 rounded-2xl bg-[#FFF2EE] text-[#F95738] flex items-center justify-center transition-transform group-hover:scale-105">
+                          {feature.icon}
+                        </div>
+
+                        <span
+                          className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                            isLive
+                              ? "bg-[#EAF8F0] text-[#1E8E3E]"
+                              : "bg-[#F1F3F5] text-[#6C757D]"
+                          }`}
+                        >
+                          {feature.status}
+                        </span>
+                      </div>
+
+                      {/* Card Bottom: Title, Subtitle & Arrow */}
+                      <div className="flex items-end justify-between gap-2 mt-auto">
+                        <div className="space-y-0.5">
+                          <h3 className="text-sm font-bold text-slate-900 group-hover:text-[#F95738] transition-colors">
+                            {feature.title}
+                          </h3>
+                          <p className="text-xs text-slate-400 font-normal">
+                            {feature.subtitle}
+                          </p>
+                        </div>
+
+                        <div className="w-7 h-7 rounded-full bg-slate-50 group-hover:bg-[#FEECE8] text-slate-400 group-hover:text-[#F95738] flex items-center justify-center shrink-0 transition-colors">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 4. Bottom Tip Banner and Action Buttons */}
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2">
+              {/* Tip Banner */}
+              <div className="flex-1 bg-[#FFF5F2] border border-[#FDDCD3]/70 rounded-xl px-4 py-3 flex items-center gap-3">
+                <div className="w-6 h-6 rounded-md bg-[#FEECE8] text-[#F95738] flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                    <line x1="9" y1="18" x2="15" y2="18" />
+                    <line x1="10" y1="22" x2="14" y2="22" />
+                    <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14" />
+                  </svg>
+                </div>
+                <p className="text-xs text-slate-700 leading-snug">
+                  <span className="font-bold text-slate-900">Tip:</span> Stores with <span className="font-semibold text-slate-900">5+ live features</span> see a <span className="font-semibold text-[#F95738]">2.3x higher attributed revenue</span> on average.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={() => alert("Contact support: support@cartelevate.com")}
+                  className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition shadow-2xs flex items-center gap-1.5"
+                >
+                  <span>💬</span>
+                  <span>Issues? Contact us</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => alert("Thank you for using CartElevate! Rate us 5 stars on Shopify App Store.")}
+                  className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition shadow-2xs flex items-center gap-1.5"
+                >
+                  <span>⭐</span>
+                  <span>Review us</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ================= RIGHT COLUMN: LIVE PREVIEW (col-span-5) ================= */}
+          <div className="xl:col-span-5 sticky top-6">
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-4 sm:p-6 shadow-sm">
+              <LiveCartPreview branding={branding} />
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* Feature clicked feedback notification modal */}
+      {selectedFeature && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#FFF2EE] text-[#F95738] flex items-center justify-center mx-auto text-xl">
+              ⚙️
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">{selectedFeature}</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                You can configure rules, design styles, and milestones directly in the cart drawer preview.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedFeature(null)}
+              className="w-full bg-[#18181B] hover:bg-black text-white text-xs font-bold py-2.5 rounded-xl transition"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
-
-export const headers = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};

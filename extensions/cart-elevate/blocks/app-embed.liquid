@@ -26,6 +26,8 @@
 
 <script>
   window.CartElevateSettings = {% if shop.metafields.cart_elevate.settings.value != blank %}{{ shop.metafields.cart_elevate.settings.value | json }}{% else %}null{% endif %};
+  window.CartElevateBranding = {% if shop.metafields.cart_elevate.branding.value != blank %}{{ shop.metafields.cart_elevate.branding.value | json }}{% elsif shop.metafields.cart_elevate.branding != blank %}{{ shop.metafields.cart_elevate.branding | json }}{% else %}null{% endif %};
+  window.CartElevateItemCount = {{ cart.item_count | default: 0 }};
 </script>
 
 <script>

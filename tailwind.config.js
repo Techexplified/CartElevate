@@ -7,6 +7,18 @@ export default {
   theme: {
     extend: {
       colors: {
+        coral: {
+          50:  "#fff5f2",
+          100: "#feeee8",
+          200: "#fdd9cd",
+          300: "#fcbda7",
+          400: "#fa8f6e",
+          500: "#f95738",
+          600: "#ea4323",
+          700: "#c43317",
+          800: "#9c2a15",
+          900: "#7e2615",
+        },
         brand: {
           50:  "#f0fdf9",
           100: "#ccfbef",
