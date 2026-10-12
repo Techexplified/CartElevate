@@ -25,7 +25,7 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { session, redirect } = await authenticate.admin(request);
+  const { session, admin, redirect } = await authenticate.admin(request);
   const shop = session.shop;
 
   const formData = await request.formData();
@@ -33,15 +33,33 @@ export const action = async ({ request }) => {
 
   if (intent === "connect_store") {
     try {
-      // Save onboarding data in settings entity
+      // 1. Fetch merchant currency from Shopify Admin GraphQL API
+      let currency = "USD";
+      try {
+        const shopRes = await admin.graphql(`
+          query GetShopCurrency {
+            shop {
+              currencyCode
+            }
+          }
+        `);
+        const shopData = await shopRes.json();
+        currency = shopData?.data?.shop?.currencyCode || "USD";
+      } catch (curErr) {
+        console.warn("[CartElevate] Could not fetch shop currency code:", curErr.message);
+      }
+
+      // 2. Save onboarding data and currency in settings entity
       await prisma.settings.upsert({
         where: { shop },
         create: {
           shop,
           isOnboarded: true,
+          currency,
         },
         update: {
           isOnboarded: true,
+          currency,
         },
       });
 

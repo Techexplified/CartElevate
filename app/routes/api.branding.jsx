@@ -2,15 +2,19 @@ import prisma from "../db.server";
 
 // Public storefront API endpoint for Cart Drawer Branding
 export const loader = async ({ request }) => {
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
-
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
-    "Cache-Control": "public, max-age=60, stale-while-revalidate=120",
+    "Cache-Control": "no-store, no-cache, must-revalidate",
   };
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop");
 
   if (!shop) {
     return Response.json(
@@ -20,6 +24,7 @@ export const loader = async ({ request }) => {
         branding: {
           logoUrl: "",
           accentColor: "#F95738",
+          cartTitle: "Your Cart",
           drawerPosition: "right",
         },
       },
@@ -31,7 +36,7 @@ export const loader = async ({ request }) => {
     let branding = null;
 
     if (prisma.cartDrawerBranding) {
-        branding = await prisma.cartDrawerBranding.findUnique({
+      branding = await prisma.cartDrawerBranding.findUnique({
         where: { shop },
       });
     } else {
@@ -50,14 +55,18 @@ export const loader = async ({ request }) => {
       }
     }
 
+    const rawPos = String(branding?.drawerPosition || "right").toLowerCase().trim();
+    const safeBranding = {
+      logoUrl: branding?.logoUrl || "",
+      accentColor: branding?.accentColor || "#F95738",
+      cartTitle: branding?.cartTitle || "Your Cart",
+      drawerPosition: rawPos === "left" ? "left" : "right",
+    };
+
     return Response.json(
       {
         success: true,
-        branding: branding || {
-          logoUrl: "",
-          accentColor: "#F95738",
-          drawerPosition: "right",
-        },
+        branding: safeBranding,
       },
       { headers: corsHeaders }
     );
@@ -70,6 +79,7 @@ export const loader = async ({ request }) => {
         branding: {
           logoUrl: "",
           accentColor: "#F95738",
+          cartTitle: "Your Cart",
           drawerPosition: "right",
         },
       },

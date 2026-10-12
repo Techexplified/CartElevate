@@ -27,8 +27,16 @@
 <script>
   window.CartElevateSettings = {% if shop.metafields.cart_elevate.settings.value != blank %}{{ shop.metafields.cart_elevate.settings.value | json }}{% else %}null{% endif %};
   window.CartElevateBranding = {% if shop.metafields.cart_elevate.branding.value != blank %}{{ shop.metafields.cart_elevate.branding.value | json }}{% elsif shop.metafields.cart_elevate.branding != blank %}{{ shop.metafields.cart_elevate.branding | json }}{% else %}null{% endif %};
+  window.CartElevateProgressBar = {% if shop.metafields.cart_elevate.shipping_bar.value != blank %}{{ shop.metafields.cart_elevate.shipping_bar.value | json }}{% elsif shop.metafields.cart_elevate.shipping_bar != blank %}{{ shop.metafields.cart_elevate.shipping_bar | json }}{% else %}null{% endif %};
   window.CartElevateItemCount = {{ cart.item_count | default: 0 }};
+  window.CartElevateShop = {{ shop.permanent_domain | json }};
 </script>
+
+{{ 'feature-cart-branding.css' | asset_url | stylesheet_tag }}
+{{ 'feature-shipping-bar.css' | asset_url | stylesheet_tag }}
+
+<script src="{{ 'feature-cart-branding.js' | asset_url }}" defer></script>
+<script src="{{ 'feature-shipping-bar.js' | asset_url }}" defer></script>
 
 <script>
 (function () {

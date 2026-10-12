@@ -243,6 +243,8 @@ export default function MainDashboardPage() {
                       onClick={() => {
                         if (feature.id === "branding") {
                           navigate("/app/CartDrawerBranding");
+                        } else if (feature.id === "shipping-bar") {
+                          navigate("/app/s-a-g-p-b");
                         } else {
                           setSelectedFeature(feature.title);
                         }

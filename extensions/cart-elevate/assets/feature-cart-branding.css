@@ -1,0 +1,197 @@
+/* CartElevate — Feature: Cart Drawer Branding & Positioning */
+
+/* 1. Branded Drawer Header */
+.ce-branded-header,
+cart-drawer .drawer__header,
+.drawer__header,
+.cart-drawer__header,
+.CartDrawer__Header {
+  background-color: var(--ce-accent-color, #F95738) !important;
+  color: #ffffff !important;
+  padding: 16px 20px !important;
+  margin: 0 0 18px 0 !important;
+  transition: background-color 0.25s ease !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  z-index: 10 !important;
+  width: 100% !important;
+  flex-shrink: 0 !important;
+}
+
+/* Fix overlap: Push cart items down with comfortable breathing room */
+cart-drawer-items,
+.drawer__contents,
+.cart-drawer__content,
+.drawer__cart-items-wrapper,
+#CartDrawer-CartItems,
+.cart-items {
+  margin-top: 10px !important;
+  padding-top: 6px !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* Heading title (e.g. "Your Cart (3)") */
+.ce-branded-header .drawer__heading,
+.drawer__header .drawer__heading,
+.drawer__header h2,
+.drawer__header h3,
+.ce-branded-header .cart-drawer__title,
+.ce-branded-header .CartDrawer__Title,
+.ce-branded-header h2,
+.ce-branded-header h3,
+.ce-branded-header [class*="heading"],
+.ce-branded-header [class*="title"],
+.drawer__header [class*="heading"],
+.drawer__header [class*="title"] {
+  color: #ffffff !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* Close button inside branded header */
+.ce-branded-header button[type="button"],
+.ce-branded-header .drawer__close,
+.ce-branded-header .close-button,
+.ce-branded-header .cart-drawer__close,
+.ce-branded-header .theme-drawer__close-button,
+.ce-branded-header [class*="close"],
+.drawer__header .close-button {
+  color: #ffffff !important;
+  background: transparent !important;
+  opacity: 0.9 !important;
+  transition: opacity 0.2s, transform 0.2s !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+}
+
+.ce-branded-header button[type="button"]:hover,
+.ce-branded-header .close-button:hover {
+  opacity: 1 !important;
+  transform: scale(1.08) !important;
+}
+
+.ce-branded-header button svg,
+.ce-branded-header .close-button svg {
+  stroke: #ffffff !important;
+  color: #ffffff !important;
+}
+
+/* 2. Header Badges */
+.ce-header-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle !important;
+  margin-right: 12px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Rounded Logo Badge */
+.ce-logo-badge {
+  width: 90px !important;
+  height: 28px !important;
+  background: #ffffff !important;
+  border-radius: 9999px !important;
+  padding: 3px 8px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+  overflow: hidden !important;
+}
+
+.ce-logo-badge img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+/* Circular Cart Icon Badge */
+.ce-cart-icon-badge {
+  width: 32px !important;
+  height: 32px !important;
+  background: #ffffff !important;
+  border-radius: 50% !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+}
+
+.ce-cart-icon-badge svg {
+  width: 16px !important;
+  height: 16px !important;
+  display: block !important;
+}
+
+.ce-heading-text {
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  font-size: 16px !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* 3. Drawer position — Horizon (dialog-based drawer) */
+.ce-drawer-left dialog.cart-drawer__dialog,
+.ce-drawer-left dialog.theme-drawer__dialog,
+.ce-drawer-left dialog[class*="cart-drawer"] {
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: auto !important;
+  inset-inline-start: 0 !important;
+  inset-inline-end: auto !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+/* Horizon pins .close-button fixed to right edge — keep it inside header */
+.ce-drawer-left .cart-drawer__header .close-button,
+.ce-drawer-left .cart-drawer__close-button,
+.ce-drawer-left .theme-drawer__close-button {
+  position: absolute !important;
+  left: auto !important;
+  right: 12px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+
+/* 4. Drawer animation — slide in from the LEFT edge (Horizon dialog drawer) */
+@keyframes ce-slide-in-left {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes ce-slide-out-left {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
+}
+
+/* Opening */
+.ce-drawer-left dialog.cart-drawer__dialog[open],
+.ce-drawer-left dialog.theme-drawer__dialog[open] {
+  translate: none !important;
+  transition: none !important;
+  animation: ce-slide-in-left 0.3s cubic-bezier(0.22, 1, 0.36, 1) both !important;
+}
+
+/* Closing */
+.ce-drawer-left dialog.cart-drawer__dialog[open].dialog--closed,
+.ce-drawer-left dialog.theme-drawer__dialog[open].dialog--closed {
+  animation: ce-slide-out-left 0.25s ease-in both !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ce-drawer-left dialog.cart-drawer__dialog[open],
+  .ce-drawer-left dialog.theme-drawer__dialog[open] {
+    animation: none !important;
+  }
+}

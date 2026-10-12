@@ -36,6 +36,7 @@ model Session {
 model Settings {
   shop        String   @id
   isOnboarded Boolean  @default(false) @map("is_onboarded")
+  currency    String   @default("USD") @map("currency")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -53,3 +54,18 @@ model CartDrawerBranding {
 
   @@map("cart_drawer_branding")
 }
+
+model ShippingProgressBar {
+  id                String   @id @default(cuid())
+  shop              String   @unique
+  goalType          String   @default("free_shipping") @map("goal_type")
+  shippingThreshold Float    @default(75.0) @map("shipping_threshold")
+  giftThreshold     Float    @default(120.0) @map("gift_threshold")
+  messageBeforeGoal String   @default("Add {amount} more for free shipping") @map("message_before_goal")
+  discountId        String?  @map("discount_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("shipping_progress_bar")
+}
+

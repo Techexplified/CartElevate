@@ -1,133 +1,145 @@
-/* CartElevate — Storefront Cart Drawer Branding v3 */
+/* CartElevate — Core Cart Hub */
 (function(){
 'use strict';
-var count=typeof window.CartElevateItemCount==='number'?window.CartElevateItemCount:0;
-var applying=false;
-var HS=['cart-drawer .drawer__header','.drawer__header','.cart-drawer__header','.CartDrawer__Header','[data-cart-drawer-header]','.drawer-header','.js-drawer-header'];
-var IS=['cart-drawer-items','.drawer__contents','.cart-drawer__content','.drawer__cart-items-wrapper','#CartDrawer-CartItems','.cart-items'];
 
-function parse(r){
-  if(!r)return null;
-  if(typeof r==='string'){try{r=JSON.parse(r);}catch(e){}}
-  if(typeof r==='string'){try{r=JSON.parse(r);}catch(e){}}
-  return(r&&typeof r==='object')?r:null;
-}
-function getBranding(){
-  return parse(window.CartElevateBranding)||{accentColor:'#F95738',logoUrl:'',cartTitle:'Your Cart',drawerPosition:'right'};
-}
+var count = typeof window.CartElevateItemCount === 'number' ? window.CartElevateItemCount : 0;
+var cartTotal = 0;
+var cartCurrency = 'USD';
+var isFetching = false;
+var debounceTimer = null;
 
-function iconSvg(c){
-  return'<svg viewBox="0 0 24 24" fill="none" stroke="'+c+'" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1.5"/><circle cx="19" cy="21" r="1.5"/><path d="M2.5 3h2.5l2.2 11.5a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.2l1.4-7.5H6.5"/></svg>';
+function emitCartUpdate(){
+  var detail = {
+    count: count,
+    cartTotal: cartTotal,
+    cartCurrency: cartCurrency,
+    timestamp: Date.now()
+  };
+  try{
+    document.dispatchEvent(new CustomEvent('cartelevate:cart-updated', { detail: detail }));
+  }catch(e){
+    console.error('[CE-Core] Event dispatch error:', e);
+  }
 }
 
 function fetchCount(cb){
-  fetch('/cart.js').then(function(r){return r.json();}).then(function(c){
-    if(c&&typeof c.item_count==='number'){count=c.item_count;if(cb)cb();}
-  }).catch(function(){if(cb)cb();});
-}
-
-function styleHeaders(br){
-  if(applying)return;
-  applying=true;
-  try{
-    var ac=(br&&br.accentColor)||'#F95738';
-    var logo=(br&&br.logoUrl)||'';
-    var titleBase=(br&&br.cartTitle)||'Your Cart';
-    var tx=titleBase+' ('+count+')';
-    var bt=logo?'logo':'cart';
-
-    HS.forEach(function(hs){
-      document.querySelectorAll(hs).forEach(function(h){
-        if(!h.classList.contains('ce-branded-header'))h.classList.add('ce-branded-header');
-        h.style.setProperty('background-color',ac,'important');
-        h.style.setProperty('margin-bottom','18px','important');
-        h.style.setProperty('position','relative','important');
-        h.style.setProperty('z-index','10','important');
-
-        var dp=h.closest('cart-drawer, .drawer__inner, .cart-drawer');
-        if(dp){IS.forEach(function(s){var el=dp.querySelector(s);if(el){el.style.setProperty('margin-top','10px','important');el.style.setProperty('padding-top','6px','important');el.style.setProperty('position','relative','important');el.style.setProperty('z-index','1','important');}});}
-
-        var t=h.querySelector('.drawer__heading, [class*="heading"], [class*="title"], h1, h2, h3, h4');
-        if(!t)return;
-
-        var ew=t.querySelector('#ce-title-wrapper');
-        var et=t.querySelector('.ce-heading-text');
-        var eb=t.querySelector('#ce-header-badge');
-
-        if(ew&&eb&&eb.getAttribute('data-type')===bt&&et&&et.textContent===tx)return;
-
-        t.innerHTML='';
-        t.style.setProperty('display','inline-flex','important');
-        t.style.setProperty('align-items','center','important');
-
-        var w=document.createElement('div');
-        w.id='ce-title-wrapper';
-        w.style.display='inline-flex';
-        w.style.alignItems='center';
-
-        var b=document.createElement('div');
-        b.id='ce-header-badge';
-        b.setAttribute('data-type',bt);
-
-        if(logo){
-          b.className='ce-header-badge ce-logo-badge';
-          var img=document.createElement('img');
-          img.src=logo;img.alt='Logo';
-          img.onerror=function(){
-            b.className='ce-header-badge ce-cart-icon-badge';
-            b.innerHTML=iconSvg(ac);
-          };
-          b.appendChild(img);
-        }else{
-          b.className='ce-header-badge ce-cart-icon-badge';
-          b.innerHTML=iconSvg(ac);
-        }
-        w.appendChild(b);
-
-        var sp=document.createElement('span');
-        sp.className='ce-heading-text';
-        sp.textContent=tx;
-        w.appendChild(sp);
-        t.appendChild(w);
-      });
+  if(isFetching) return;
+  isFetching = true;
+  fetch('/cart.js?ce_sync=' + Date.now(), { cache: 'no-store' })
+    .then(function(r){ return r.json(); })
+    .then(function(c){
+      isFetching = false;
+      if(c && typeof c.item_count === 'number'){
+        count = c.item_count;
+        cartTotal = typeof c.total_price === 'number' ? c.total_price / 100 : 0;
+        if(c.currency) cartCurrency = c.currency;
+        emitCartUpdate();
+        if(cb) cb(c);
+      }
+    })
+    .catch(function(){
+      isFetching = false;
+      if(cb) cb();
     });
-  }catch(e){console.error('[CE]',e);}finally{applying=false;}
 }
 
-function applyBranding(br){
-  if(!br)return;
-  var ac=br.accentColor||'#F95738';
-  var pos=br.drawerPosition||'right';
-  document.documentElement.style.setProperty('--ce-accent-color',ac);
-  if(pos==='left'){document.body.classList.add('ce-drawer-left');}else{document.body.classList.remove('ce-drawer-left');}
-  styleHeaders(br);
+function triggerSync(delay){
+  var ms = typeof delay === 'number' ? delay : 120;
+  if(debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(function(){
+    fetchCount();
+  }, ms);
 }
 
-function run(){
-  var br=getBranding();
-  applyBranding(br);
-  fetchCount(function(){applyBranding(getBranding());});
+// 1. Intercept window.fetch for any cart modifications by the active theme
+if(typeof window.fetch === 'function'){
+  var origFetch = window.fetch;
+  window.fetch = function(){
+    var args = arguments;
+    var url = '';
+    try{
+      url = (args && args[0]) ? (typeof args[0] === 'string' ? args[0] : (args[0].url || '')) : '';
+    }catch(e){}
+    var isCartReq = url && /\/cart(\/|\.js|$|\?)/i.test(url) && url.indexOf('ce_sync') === -1;
+    return origFetch.apply(this, args).then(function(res){
+      if(isCartReq){
+        triggerSync(80);
+        setTimeout(function(){ fetchCount(); }, 350);
+      }
+      return res;
+    });
+  };
 }
 
-if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',run);}else{run();}
+// 2. Intercept XMLHttpRequest for AJAX-based themes
+if(typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest.prototype){
+  var origOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url){
+    this._ceCartUrl = url;
+    return origOpen.apply(this, arguments);
+  };
+  var origSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = function(){
+    if(this._ceCartUrl && /\/cart(\/|\.js|$|\?)/i.test(this._ceCartUrl) && String(this._ceCartUrl).indexOf('ce_sync') === -1){
+      this.addEventListener('load', function(){
+        triggerSync(80);
+        setTimeout(function(){ fetchCount(); }, 350);
+      });
+    }
+    return origSend.apply(this, arguments);
+  };
+}
 
-var obs=new MutationObserver(function(){
-  applyBranding(getBranding());
+// 3. Debounced MutationObserver for dynamic drawers
+var obs = new MutationObserver(function(mutations){
+  var isInternal = mutations.every(function(m){
+    return m.target && (m.target.id === 'cart-elevate-root' || (m.target.closest && m.target.closest('#cart-elevate-root, .ce-branded-header')));
+  });
+  if(isInternal) return;
+
+  triggerSync(120);
 });
-obs.observe(document.body,{childList:true,subtree:true});
+obs.observe(document.body, { childList: true, subtree: true });
 
-['cart:updated','cart:refresh','sections:rendered'].forEach(function(ev){
-  document.addEventListener(ev,function(){
-    fetchCount(function(){applyBranding(getBranding());});
+// 4. Click listener on quantity steppers & removal buttons
+document.addEventListener('click', function(e){
+  var isQtyBtn = e.target && e.target.closest('button[name="plus"], button[name="minus"], .quantity__button, [name="update"], .cart-item__quantity, [data-quantity-selector], cart-remove-button, .cart-remove-button, a[href*="/cart/change"], .cart__remove, .cart-drawer__close-button, a[href*="/cart"], button[aria-controls*="CartDrawer"]');
+  if(isQtyBtn){
+    triggerSync(100);
+    setTimeout(function(){ fetchCount(); }, 400);
+  }
+}, true);
+
+// 5. Change listener on quantity inputs
+document.addEventListener('change', function(e){
+  var isQtyInput = e.target && e.target.closest('input[name="updates[]"], .quantity__input, input.cart-item__quantity, [data-quantity-input]');
+  if(isQtyInput){
+    triggerSync(100);
+    setTimeout(function(){ fetchCount(); }, 400);
+  }
+}, true);
+
+// 6. Shopify standard cart events
+['cart:updated', 'cart:refresh', 'sections:rendered', 'cart:change'].forEach(function(ev){
+  document.addEventListener(ev, function(){
+    triggerSync(60);
   });
 });
 
-// Extra triggers when user clicks any cart button
-document.addEventListener('click',function(e){
-  var btn=e.target&&e.target.closest('a[href*="/cart"], button[aria-controls*="CartDrawer"], [data-cart-drawer-trigger], .header__icon--cart');
-  if(btn){
-    setTimeout(run,60);
-    setTimeout(run,250);
-  }
-},true);
+// 7. Initial boot
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', function(){ fetchCount(); });
+} else {
+  fetchCount();
+}
+
+// Global namespace
+window.CartElevate = {
+  fetchCount: fetchCount,
+  getCartData: function(){
+    return { count: count, cartTotal: cartTotal, cartCurrency: cartCurrency };
+  },
+  refresh: function(){ triggerSync(50); }
+};
+
 })();

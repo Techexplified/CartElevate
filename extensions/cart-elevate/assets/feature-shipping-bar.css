@@ -1,0 +1,71 @@
+/* CartElevate — Feature: Shipping & Free Gift Progress Bar */
+
+.ce-progress-bar-card {
+  background: #FFF5F2 !important;
+  border: 1px solid #FDE2D9 !important;
+  border-radius: 16px !important;
+  padding: 12px 14px !important;
+  margin: 10px 16px 14px 16px !important;
+  box-sizing: border-box !important;
+  font-family: inherit !important;
+  position: relative !important;
+  z-index: 5 !important;
+}
+
+.ce-pb-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin-bottom: 8px !important;
+}
+
+.ce-pb-icon {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  background: #FEE9E2 !important;
+  color: var(--ce-accent-color, #F95738) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+.ce-pb-icon svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.ce-pb-text {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #E04828 !important;
+  line-height: 1.25 !important;
+  margin: 0 !important;
+}
+
+.ce-pb-track {
+  width: 100% !important;
+  height: 8px !important;
+  border-radius: 9999px !important;
+  background: #ffffff !important;
+  border: 1px solid #FCD6CA !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+.ce-pb-fill {
+  height: 100% !important;
+  border-radius: 9999px !important;
+  background-color: var(--ce-accent-color, #F95738) !important;
+  transition: width 0.35s ease !important;
+}
+
+.ce-pb-markers {
+  display: flex !important;
+  justify-content: space-between !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #94A3B8 !important;
+  margin-top: 4px !important;
+}
