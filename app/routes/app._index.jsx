@@ -1,12 +1,12 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useLoaderData, useNavigate } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { useLoadingScreen } from "../components/LoadingContext";
 import LiveCartPreview from "../components/LiveCartPreview";
+import { deleteVolumeDiscounts, activatePostPurchaseDiscount } from "../services/discount.server";
 
 export const loader = async ({ request }) => {
-  const { session, redirect } = await authenticate.admin(request);
+  const { session, admin, redirect } = await authenticate.admin(request);
   const shop = session.shop;
 
   // 1. Check whether app data is present in DB for this shop
@@ -45,26 +45,219 @@ export const loader = async ({ request }) => {
     console.error("[CartElevate] Error checking branding in DB:", err);
   }
 
-  // 3. App data is present in DB -> render main page
+  // 2b. Check whether shipping and gift progress bar is configured in DB
+  let shippingBar = null;
+  let isShippingBarLive = false;
+  try {
+    const spb = await prisma.shippingProgressBar.findUnique({
+      where: { shop },
+    });
+    if (spb) {
+      shippingBar = {
+        isLive: true,
+        goalType: spb.goalType || "free_shipping",
+        shippingThreshold: Number(spb.shippingThreshold) || 75.0,
+        giftThreshold: Number(spb.giftThreshold) || 120.0,
+        messageBeforeGoal: spb.messageBeforeGoal || "Add {amount} more for free shipping",
+        giftProductTitle: spb.giftProductTitle || null,
+        giftProductImage: spb.giftProductImage || null,
+        giftProductPrice: spb.giftProductPrice !== null ? Number(spb.giftProductPrice) : null,
+      };
+      isShippingBarLive = true;
+    }
+  } catch (err) {
+    console.error("[CartElevate] Error checking shipping bar in DB:", err);
+  }
+
+  // 3. Check whether recommendations are enabled/live for this shop
+  let isRecommendationsLive = false;
+  let recommendations = { isLive: false, sets: [] };
+  try {
+    const metaQuery = await admin.graphql(`
+      query GetRecommendationMetafield {
+        shop {
+          metafield(namespace: "cartelevate", key: "recommendations") {
+            value
+          }
+        }
+      }
+    `);
+    const metaRes = await metaQuery.json();
+    const rawVal = metaRes?.data?.shop?.metafield?.value;
+    if (rawVal) {
+      const parsed = typeof rawVal === "string" ? JSON.parse(rawVal) : rawVal;
+      let sets = [];
+      if (Array.isArray(parsed.sets)) {
+        sets = parsed.sets;
+      } else if (parsed && parsed.logic) {
+        sets = [parsed];
+      }
+      const DUMMY_SET_IDS = new Set(["set_kitchenware_1", "set_homedecor_2", "set_highestmargin_3"]);
+      const liveSets = sets.filter((s) => s && s.id && !DUMMY_SET_IDS.has(s.id) && s.status === "PUBLISHED");
+      isRecommendationsLive = liveSets.length > 0;
+      recommendations = {
+        isLive: isRecommendationsLive,
+        sets: liveSets,
+      };
+    }
+  } catch (err) {
+    console.error("[CartElevate] Error checking recommendations metafield in dashboard loader:", err);
+  }
+
+  // 4. Check whether bundles and discounts are enabled/live for this shop
+  let isBundlesLive = false;
+  let bundles = { isLive: false, list: [] };
+  try {
+    const bundlesQuery = await admin.graphql(`
+      query GetBundlesMetafield {
+        shop {
+          metafield(namespace: "cartelevate", key: "bundles") {
+            value
+          }
+        }
+      }
+    `);
+    const bundlesRes = await bundlesQuery.json();
+    const rawBundlesVal = bundlesRes?.data?.shop?.metafield?.value;
+    if (rawBundlesVal) {
+      const parsed = typeof rawBundlesVal === "string" ? JSON.parse(rawBundlesVal) : rawBundlesVal;
+      let bundlesList = Array.isArray(parsed.bundles) ? parsed.bundles : (Array.isArray(parsed) ? parsed : []);
+      const liveBundles = bundlesList.filter((b) => b && b.status === "PUBLISHED");
+      isBundlesLive = liveBundles.length > 0;
+      bundles = {
+        isLive: isBundlesLive,
+        list: liveBundles,
+      };
+
+      if (!isBundlesLive) {
+        deleteVolumeDiscounts({ admin }).catch(() => {});
+      }
+    } else {
+      deleteVolumeDiscounts({ admin }).catch(() => {});
+    }
+  } catch (err) {
+    console.error("[CartElevate] Error checking bundles metafield in dashboard loader:", err);
+  }
+
+  // 5. Check whether protection & wrapping is enabled/live for this shop
+  let isProtectionLive = false;
+  let protectionWrapping = {
+    isLive: false,
+    protection: { enabled: false, flatFee: 1.99 },
+    giftWrapping: { enabled: false, price: 4.0 },
+  };
+  try {
+    const protQuery = await admin.graphql(`
+      query GetProtectionMetafield {
+        shop {
+          metafield(namespace: "cartelevate", key: "protection_wrapping") {
+            value
+          }
+        }
+      }
+    `);
+    const protRes = await protQuery.json();
+    const rawProtVal = protRes?.data?.shop?.metafield?.value;
+    if (rawProtVal) {
+      const parsed = typeof rawProtVal === "string" ? JSON.parse(rawProtVal) : rawProtVal;
+      const protEnabled = Boolean(parsed?.protection?.enabled);
+      const giftEnabled = Boolean(parsed?.giftWrapping?.enabled);
+      isProtectionLive = protEnabled || giftEnabled;
+      protectionWrapping = {
+        isLive: isProtectionLive,
+        protection: {
+          enabled: protEnabled,
+          priceType: parsed?.protection?.priceType || "flat",
+          percentage: Number(parsed?.protection?.percentage) || 10,
+          flatFee: Number(parsed?.protection?.flatFee) || 2.03,
+          description: parsed?.protection?.description || "Protect your order from loss or damage",
+        },
+        giftWrapping: {
+          enabled: giftEnabled,
+          price: Number(parsed?.giftWrapping?.price) || 5.0,
+          description: parsed?.giftWrapping?.description || "Add gift wrapping",
+        },
+      };
+    }
+  } catch (err) {
+    console.error("[CartElevate] Error checking protection metafield in dashboard loader:", err);
+  }
+
+  // 6. Check whether post-purchase offers are live
+  let isPostPurchaseLive = false;
+  let postPurchase = { isLive: false, offer: null };
+  try {
+    const postQuery = await admin.graphql(`
+      query GetPostPurchaseMetafield {
+        shop {
+          metafield(namespace: "cartelevate", key: "post_purchase") {
+            value
+          }
+        }
+      }
+    `);
+    const postRes = await postQuery.json();
+    const rawPostVal = postRes?.data?.shop?.metafield?.value;
+    if (rawPostVal) {
+      const parsed = typeof rawPostVal === "string" ? JSON.parse(rawPostVal) : rawPostVal;
+      const offers = Array.isArray(parsed?.offers) ? parsed.offers : (Array.isArray(parsed) ? parsed : []);
+      const liveOffer = offers.find((o) => o && o.status === "PUBLISHED");
+      isPostPurchaseLive = Boolean(liveOffer);
+      if (liveOffer) {
+        if (liveOffer.discountId) {
+          activatePostPurchaseDiscount({ admin, discountId: liveOffer.discountId, offer: liveOffer }).catch(() => {});
+        }
+        postPurchase = {
+          isLive: true,
+          offer: {
+            productTitle: liveOffer.productTitle || "Exclusive Offer",
+            productImage: liveOffer.productImage || "",
+            productPrice: Number(liveOffer.productPrice) || 20.0,
+            discountPercentage: Number(liveOffer.discountPercentage) || 20,
+            headline: liveOffer.headline || "Wait! Add this before you go",
+            showTimer: liveOffer.showTimer !== false,
+          },
+        };
+      }
+    }
+  } catch (err) {
+    console.error("[CartElevate] Error checking post-purchase metafield in dashboard loader:", err);
+  }
+
+  // 7. App data is present in DB -> render main page
   return {
     shop,
     isOnboarded: settings.isOnboarded,
     branding,
+    shippingBar,
+    isShippingBarLive,
+    recommendations,
+    isRecommendationsLive,
+    bundles,
+    isBundlesLive,
+    protectionWrapping,
+    isProtectionLive,
+    postPurchase,
+    isPostPurchaseLive,
   };
 };
 
 export default function MainDashboardPage() {
-  const { shop, branding } = useLoaderData();
+  const {
+    branding,
+    shippingBar,
+    isShippingBarLive,
+    recommendations,
+    isRecommendationsLive,
+    bundles,
+    isBundlesLive,
+    protectionWrapping,
+    isProtectionLive,
+    postPurchase,
+    isPostPurchaseLive,
+  } = useLoaderData();
   const navigate = useNavigate();
-  const { showLoading, hideLoading } = useLoadingScreen();
   const [selectedFeature, setSelectedFeature] = useState(null);
-
-  const handlePreviewLoading = () => {
-    showLoading();
-    setTimeout(() => {
-      hideLoading();
-    }, 2000);
-  };
 
   // Feature cards data matching user screenshot
   const features = [
@@ -84,7 +277,7 @@ export default function MainDashboardPage() {
       id: "shipping-bar",
       title: "Shipping and gift bar",
       subtitle: "Thresholds, messaging",
-      status: "LIVE",
+      status: isShippingBarLive ? "LIVE" : "NOT SET UP",
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
           <rect x="3" y="8" width="18" height="4" rx="1" />
@@ -98,7 +291,7 @@ export default function MainDashboardPage() {
       id: "recommendations",
       title: "Recommendations",
       subtitle: "Rule based products",
-      status: "NOT SET UP",
+      status: isRecommendationsLive ? "LIVE" : "NOT SET UP",
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
           <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
@@ -109,7 +302,7 @@ export default function MainDashboardPage() {
       id: "bundles",
       title: "Bundles and discounts",
       subtitle: "Volume based pricing",
-      status: "NOT SET UP",
+      status: isBundlesLive ? "LIVE" : "NOT SET UP",
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
           <polygon points="12 2 2 7 12 12 22 7 12 2" />
@@ -122,7 +315,7 @@ export default function MainDashboardPage() {
       id: "protection",
       title: "Protection and wrapping",
       subtitle: "Add on toggles",
-      status: "LIVE",
+      status: isProtectionLive ? "LIVE" : "NOT SET UP",
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
           <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
@@ -135,7 +328,7 @@ export default function MainDashboardPage() {
       id: "post-purchase",
       title: "Post purchase offer",
       subtitle: "Thank you page upsell",
-      status: "LIVE",
+      status: isPostPurchaseLive ? "LIVE" : "NOT SET UP",
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
           <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
@@ -187,10 +380,9 @@ export default function MainDashboardPage() {
             </div>
 
             {/* 2. Attributed Revenue Banner */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#FFF5F2] via-[#FFF8F6] to-[#FFF2EE] border border-[#FDDCD3]/80 p-5 sm:p-6 shadow-2xs transition-all hover:shadow-xs">
+            {/* <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#FFF5F2] via-[#FFF8F6] to-[#FFF2EE] border border-[#FDDCD3]/80 p-5 sm:p-6 shadow-2xs transition-all hover:shadow-xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-start gap-4">
-                  {/* Upward Trending Chart Icon */}
                   <div className="w-10 h-10 rounded-xl bg-[#FEECE8] text-[#F95738] flex items-center justify-center shrink-0 mt-0.5">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
                       <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
@@ -208,17 +400,16 @@ export default function MainDashboardPage() {
                   </div>
                 </div>
 
-                {/* View Analytics CTA */}
                 <button
                   type="button"
-                  onClick={() => alert("Analytics report: CartElevate drove +11.2% higher cart conversion and +$4,280 in AOV lift this month.")}
-                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#F95738] hover:text-[#EA3E1E] transition shrink-0 group self-start sm:self-auto"
+                  onClick={() => navigate("/app/analytics")}
+                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#F95738] hover:text-[#EA3E1E] transition shrink-0 group self-start sm:self-auto cursor-pointer"
                 >
                   <span>View analytics</span>
                   <span className="group-hover:translate-x-1 transition-transform">→</span>
                 </button>
               </div>
-            </div>
+            </div> */}
 
             {/* 3. "Your features" Section */}
             <div className="space-y-4">
@@ -228,7 +419,7 @@ export default function MainDashboardPage() {
                   Your features
                 </h2>
                 <span className="text-xs sm:text-sm font-semibold text-slate-400">
-                  4 of 7 live
+                  {features.filter((f) => f.status === "LIVE").length} of {features.length} live
                 </span>
               </div>
 
@@ -237,19 +428,37 @@ export default function MainDashboardPage() {
                 {features.map((feature) => {
                   const isLive = feature.status === "LIVE";
 
+                  const handleCardClick = () => {
+                    if (feature.id === "branding") {
+                      navigate("/app/CartDrawerBranding");
+                    } else if (feature.id === "shipping-bar") {
+                      navigate("/app/s-a-g-p-b");
+                    } else if (feature.id === "recommendations") {
+                      navigate("/app/recommendation");
+                    } else if (feature.id === "bundles") {
+                      navigate("/app/bundleAndDiscount");
+                    } else if (feature.id === "protection") {
+                      navigate("/app/protectionAndWrapping");
+                    } else if (feature.id === "post-purchase") {
+                      navigate("/app/postPurchase");
+                    } else {
+                      setSelectedFeature(feature.title);
+                    }
+                  };
+
                   return (
                     <div
                       key={feature.id}
-                      onClick={() => {
-                        if (feature.id === "branding") {
-                          navigate("/app/CartDrawerBranding");
-                        } else if (feature.id === "shipping-bar") {
-                          navigate("/app/s-a-g-p-b");
-                        } else {
-                          setSelectedFeature(feature.title);
+                      role="button"
+                      tabIndex={0}
+                      onClick={handleCardClick}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleCardClick();
                         }
                       }}
-                      className="group bg-white rounded-2xl border border-slate-200/70 p-5 shadow-2xs hover:shadow-md hover:border-slate-300 transition-all duration-200 cursor-pointer flex flex-col justify-between h-[155px]"
+                      className="group bg-white rounded-2xl border border-slate-200/70 p-5 shadow-2xs hover:shadow-md hover:border-slate-300 transition-all duration-200 cursor-pointer flex flex-col justify-between h-[155px] focus:outline-none focus:ring-2 focus:ring-[#F95738]/50"
                     >
                       {/* Card Top: Icon & Status Badge */}
                       <div className="flex items-start justify-between">
@@ -311,20 +520,21 @@ export default function MainDashboardPage() {
               <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
                 <button
                   type="button"
-                  onClick={() => alert("Contact support: support@cartelevate.com")}
-                  className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition shadow-2xs flex items-center gap-1.5"
+                  onClick={() => navigate("/app/contact-us")}
+                  className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>💬</span>
                   <span>Issues? Contact us</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => alert("Thank you for using CartElevate! Rate us 5 stars on Shopify App Store.")}
-                  className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition shadow-2xs flex items-center gap-1.5"
-                >
-                  <span>⭐</span>
-                  <span>Review us</span>
-                </button>
+                <a
+  href="https://apps.shopify.com/cartelevate/reviews?search_id=238929bd-3af9-4afb-993d-5bc95a4a5322"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition shadow-2xs flex items-center gap-1.5"
+>
+  <span>⭐</span>
+  <span>Review us</span>
+</a>
               </div>
             </div>
           </div>
@@ -332,7 +542,14 @@ export default function MainDashboardPage() {
           {/* ================= RIGHT COLUMN: LIVE PREVIEW (col-span-5) ================= */}
           <div className="xl:col-span-5 sticky top-6">
             <div className="bg-white rounded-3xl border border-slate-200/80 p-4 sm:p-6 shadow-sm">
-              <LiveCartPreview branding={branding} />
+              <LiveCartPreview
+                branding={branding}
+                shippingBar={shippingBar}
+                recommendations={recommendations}
+                bundles={bundles}
+                protectionWrapping={protectionWrapping}
+                postPurchase={postPurchase}
+              />
             </div>
           </div>
 

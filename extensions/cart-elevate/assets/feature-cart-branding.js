@@ -7,8 +7,8 @@ var IS = ['cart-drawer-items', '.drawer__contents', '.cart-drawer__content', '.d
 
 function parse(r){
   if(!r) return null;
-  if(typeof r === 'string'){ try{ r = JSON.parse(r); }catch(e){} }
-  if(typeof r === 'string'){ try{ r = JSON.parse(r); }catch(e){} }
+  if(typeof r === 'string'){ try{ r = JSON.parse(r); }catch(_e){ /* ignore */ } }
+  if(typeof r === 'string'){ try{ r = JSON.parse(r); }catch(_e){ /* ignore */ } }
   return (r && typeof r === 'object') ? r : null;
 }
 

@@ -63,6 +63,13 @@ model ShippingProgressBar {
   giftThreshold     Float    @default(120.0) @map("gift_threshold")
   messageBeforeGoal String   @default("Add {amount} more for free shipping") @map("message_before_goal")
   discountId        String?  @map("discount_id")
+  giftProductId     String?  @map("gift_product_id")
+  giftVariantId     String?  @map("gift_variant_id")
+  giftProductTitle  String?  @map("gift_product_title")
+  giftProductImage  String?  @map("gift_product_image")
+  giftProductPrice  Float?   @map("gift_product_price")
+  giftDiscountId    String?  @map("gift_discount_id")
+  giftQuantity      Int      @default(1) @map("gift_quantity")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 

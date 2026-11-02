@@ -2,7 +2,9 @@
 
 .ce-progress-bar-card {
   background: #FFF5F2 !important;
+  background: color-mix(in srgb, var(--ce-accent-color, #F95738) 5%, #ffffff) !important;
   border: 1px solid #FDE2D9 !important;
+  border: 1px solid color-mix(in srgb, var(--ce-accent-color, #F95738) 20%, #ffffff) !important;
   border-radius: 16px !important;
   padding: 12px 14px !important;
   margin: 10px 16px 14px 16px !important;
@@ -24,6 +26,7 @@
   height: 32px !important;
   border-radius: 50% !important;
   background: #FEE9E2 !important;
+  background: color-mix(in srgb, var(--ce-accent-color, #F95738) 14%, transparent) !important;
   color: var(--ce-accent-color, #F95738) !important;
   display: flex !important;
   align-items: center !important;
@@ -39,7 +42,7 @@
 .ce-pb-text {
   font-size: 13px !important;
   font-weight: 700 !important;
-  color: #E04828 !important;
+  color: var(--ce-accent-color, #F95738) !important;
   line-height: 1.25 !important;
   margin: 0 !important;
 }
@@ -50,6 +53,7 @@
   border-radius: 9999px !important;
   background: #ffffff !important;
   border: 1px solid #FCD6CA !important;
+  border: 1px solid color-mix(in srgb, var(--ce-accent-color, #F95738) 24%, #ffffff) !important;
   overflow: hidden !important;
   position: relative !important;
 }
@@ -68,4 +72,62 @@
   font-weight: 600 !important;
   color: #94A3B8 !important;
   margin-top: 4px !important;
+}
+
+.ce-pb-gift-pill {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  background: #ECFDF5 !important;
+  border: 1px solid #A7F3D0 !important;
+  border-radius: 8px !important;
+  padding: 6px 10px !important;
+  margin-top: 8px !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  color: #065F46 !important;
+  line-height: 1.25 !important;
+}
+
+.ce-pb-gift-pill strong {
+  font-weight: 700 !important;
+  color: #047857 !important;
+}
+
+/* Locked Free Gift item in Cart Drawer */
+.ce-gift-locked-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #065F46 !important;
+  background: #D1FAE5 !important;
+  border: 1px solid #A7F3D0 !important;
+  padding: 3px 8px !important;
+  border-radius: 9999px !important;
+  margin-top: 5px !important;
+  letter-spacing: 0.02em !important;
+}
+
+[data-ce-gift-locked="true"] .quantity__button,
+[data-ce-gift-locked="true"] button[name="plus"],
+[data-ce-gift-locked="true"] button[name="minus"],
+[data-ce-gift-locked="true"] cart-remove-button,
+[data-ce-gift-locked="true"] .cart-remove-button,
+[data-ce-gift-locked="true"] .cart__remove {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+[data-ce-gift-locked="true"] input.quantity__input,
+[data-ce-gift-locked="true"] input[name="updates[]"] {
+  pointer-events: none !important;
+  user-select: none !important;
+  cursor: default !important;
+  background: transparent !important;
+  border: none !important;
+  font-weight: 700 !important;
+  color: #0F172A !important;
 }

@@ -1,4 +1,5 @@
-import React, { useState, useRef, useMemo } from "react";
+/* eslint-disable react/prop-types, jsx-a11y/label-has-associated-control, jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
+import { useState, useRef, useMemo } from "react";
 import { useLoaderData, useNavigate, Form, useNavigation } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -106,6 +107,18 @@ export const action = async ({ request }) => {
               {
                 ownerId: shopId,
                 namespace: "cart_elevate",
+                key: "branding",
+                type: "json",
+                value: JSON.stringify({
+                  accentColor,
+                  logoUrl,
+                  drawerPosition,
+                  updatedAt: new Date().toISOString(),
+                }),
+              },
+              {
+                ownerId: shopId,
+                namespace: "cartelevate",
                 key: "branding",
                 type: "json",
                 value: JSON.stringify({
@@ -272,7 +285,9 @@ export default function CartDrawerBrandingPage() {
     setTimeout(() => {
       try {
         if (input) input.value = "";
-      } catch (err) {}
+      } catch (err) {
+        // Ignored: input reset failure is non-fatal
+      }
     }, 100);
   };
 

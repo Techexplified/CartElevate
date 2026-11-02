@@ -24,20 +24,53 @@
   aria-hidden="true"
 ></div>
 
+{%- assign ce_brand_accent = shop.metafields.cart_elevate.branding.value.accentColor | default: shop.metafields.cartelevate.branding.value.accentColor | default: shop.metafields.cart_elevate.shipping_bar.value.accentColor | default: shop.metafields.cartelevate.shipping_bar.value.accentColor -%}
+{%- if ce_brand_accent != blank -%}
+<style id="cart-elevate-dynamic-branding">
+  :root {
+    --ce-accent-color: {{ ce_brand_accent }};
+  }
+</style>
+{%- endif -%}
+
 <script>
   window.CartElevateSettings = {% if shop.metafields.cart_elevate.settings.value != blank %}{{ shop.metafields.cart_elevate.settings.value | json }}{% else %}null{% endif %};
-  window.CartElevateBranding = {% if shop.metafields.cart_elevate.branding.value != blank %}{{ shop.metafields.cart_elevate.branding.value | json }}{% elsif shop.metafields.cart_elevate.branding != blank %}{{ shop.metafields.cart_elevate.branding | json }}{% else %}null{% endif %};
-  window.CartElevateProgressBar = {% if shop.metafields.cart_elevate.shipping_bar.value != blank %}{{ shop.metafields.cart_elevate.shipping_bar.value | json }}{% elsif shop.metafields.cart_elevate.shipping_bar != blank %}{{ shop.metafields.cart_elevate.shipping_bar | json }}{% else %}null{% endif %};
+  window.CartElevateBranding = {% if shop.metafields.cart_elevate.branding.value != blank %}{{ shop.metafields.cart_elevate.branding.value | json }}{% elsif shop.metafields.cartelevate.branding.value != blank %}{{ shop.metafields.cartelevate.branding.value | json }}{% elsif shop.metafields.cart_elevate.branding != blank %}{{ shop.metafields.cart_elevate.branding | json }}{% elsif shop.metafields.cartelevate.branding != blank %}{{ shop.metafields.cartelevate.branding | json }}{% else %}null{% endif %};
+  window.CartElevateProgressBar = {% if shop.metafields.cart_elevate.shipping_bar.value != blank %}{{ shop.metafields.cart_elevate.shipping_bar.value | json }}{% elsif shop.metafields.cartelevate.shipping_bar.value != blank %}{{ shop.metafields.cartelevate.shipping_bar.value | json }}{% elsif shop.metafields.cart_elevate.shipping_bar != blank %}{{ shop.metafields.cart_elevate.shipping_bar | json }}{% elsif shop.metafields.cartelevate.shipping_bar != blank %}{{ shop.metafields.cartelevate.shipping_bar | json }}{% else %}null{% endif %};
+  window.CartElevateRecommendations = {% if shop.metafields.cartelevate.recommendations.value != blank %}{{ shop.metafields.cartelevate.recommendations.value | json }}{% elsif shop.metafields.cart_elevate.recommendations.value != blank %}{{ shop.metafields.cart_elevate.recommendations.value | json }}{% else %}null{% endif %};
+  window.CartElevateBundles = {% if shop.metafields.cartelevate.bundles.value != blank %}{{ shop.metafields.cartelevate.bundles.value | json }}{% elsif shop.metafields.cart_elevate.bundles.value != blank %}{{ shop.metafields.cart_elevate.bundles.value | json }}{% else %}null{% endif %};
+  window.CartElevateProtectionWrapping = {% if shop.metafields.cartelevate.protection_wrapping.value != blank %}{{ shop.metafields.cartelevate.protection_wrapping.value | json }}{% elsif shop.metafields.cart_elevate.protection_wrapping.value != blank %}{{ shop.metafields.cart_elevate.protection_wrapping.value | json }}{% else %}null{% endif %};
+  window.CartElevateAppUrl = {% if shop.metafields.cartelevate.app_url.value != blank %}{{ shop.metafields.cartelevate.app_url.value | json }}{% elsif shop.metafields.cart_elevate.app_url.value != blank %}{{ shop.metafields.cart_elevate.app_url.value | json }}{% elsif shop.metafields.cartelevate.post_purchase.value.appUrl != blank %}{{ shop.metafields.cartelevate.post_purchase.value.appUrl | json }}{% elsif shop.metafields.cartelevate.protection_wrapping.value.appUrl != blank %}{{ shop.metafields.cartelevate.protection_wrapping.value.appUrl | json }}{% elsif shop.metafields.cartelevate.recommendations.value.appUrl != blank %}{{ shop.metafields.cartelevate.recommendations.value.appUrl | json }}{% else %}""{% endif %};
   window.CartElevateItemCount = {{ cart.item_count | default: 0 }};
   window.CartElevateShop = {{ shop.permanent_domain | json }};
+  window.CartElevateCartCollections = {
+    {%- for item in cart.items -%}
+      "{{ item.product_id }}": [
+        {%- for collection in item.product.collections -%}
+          { "id": {{ collection.id }}, "handle": {{ collection.handle | json }}, "title": {{ collection.title | json }} }{%- unless forloop.last -%},{%- endunless -%}
+        {%- endfor -%}
+      ]{%- unless forloop.last -%},{%- endunless -%}
+    {%- endfor -%}
+  };
+  window.CartElevateCurrency = {{ cart.currency.iso_code | default: shop.currency | json }};
+  window.CartElevateCurrencySymbol = {{ cart.currency.symbol | default: '$' | json }};
+  window.CartElevateMoneyFormat = {{ shop.money_format | json }};
+  window.CartElevatePostPurchase = {% if shop.metafields.cartelevate.post_purchase.value != blank %}{{ shop.metafields.cartelevate.post_purchase.value | json }}{% elsif shop.metafields.cartelevate.post_purchase != blank %}{{ shop.metafields.cartelevate.post_purchase | json }}{% else %}null{% endif %};
 </script>
 
 {{ 'feature-cart-branding.css' | asset_url | stylesheet_tag }}
 {{ 'feature-shipping-bar.css' | asset_url | stylesheet_tag }}
+{{ 'feature-recommendations.css' | asset_url | stylesheet_tag }}
+{{ 'feature-bundles.css' | asset_url | stylesheet_tag }}
+{{ 'feature-protection-wrapping.css' | asset_url | stylesheet_tag }}
+{{ 'feature-post-purchase.css' | asset_url | stylesheet_tag }}
 
 <script src="{{ 'feature-cart-branding.js' | asset_url }}" defer></script>
 <script src="{{ 'feature-shipping-bar.js' | asset_url }}" defer></script>
-
+<script src="{{ 'feature-recommendations.js' | asset_url }}" defer></script>
+<script src="{{ 'feature-bundles.js' | asset_url }}" defer></script>
+<script src="{{ 'feature-protection-wrapping.js' | asset_url }}" defer></script>
+<script src="{{ 'feature-post-purchase.js' | asset_url }}" defer></script>
 <script>
 (function () {
   'use strict';

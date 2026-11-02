@@ -50,18 +50,26 @@ export const action = async ({ request }) => {
       }
 
       // 2. Save onboarding data and currency in settings entity
-      await prisma.settings.upsert({
-        where: { shop },
-        create: {
-          shop,
-          isOnboarded: true,
-          currency,
-        },
-        update: {
-          isOnboarded: true,
-          currency,
-        },
-      });
+      try {
+        await prisma.$executeRaw`
+          INSERT INTO "settings" ("shop", "is_onboarded", "currency", "created_at", "updated_at")
+          VALUES (${shop}, true, ${currency}, NOW(), NOW())
+          ON CONFLICT ("shop") DO UPDATE
+          SET "is_onboarded" = true, "currency" = ${currency}, "updated_at" = NOW()
+        `;
+      } catch (dbErr) {
+        console.warn("[CartElevate] Onboarding raw upsert fallback:", dbErr.message);
+        await prisma.settings.upsert({
+          where: { shop },
+          create: {
+            shop,
+            isOnboarded: true,
+          },
+          update: {
+            isOnboarded: true,
+          },
+        });
+      }
 
       // Redirect user to the main page once connected
       return redirect("/app");

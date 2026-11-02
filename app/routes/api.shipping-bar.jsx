@@ -64,7 +64,9 @@ export const loader = async ({ request }) => {
         const setRow = await prisma.settings.findUnique({ where: { shop } });
         if (setRow && setRow.currency) currency = setRow.currency;
       }
-    } catch(e) {}
+    } catch {
+      // Currency fetch skipped
+    }
 
     const CURRENCY_SYMBOLS = {
       USD: "$", EUR: "€", GBP: "£", CAD: "CA$", AUD: "A$", INR: "₹", JPY: "¥", CNY: "¥", AED: "AED ", BRL: "R$",

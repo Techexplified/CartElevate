@@ -1,0 +1,238 @@
+/* CartElevate — Feature: Bundles & Volume Discounts */
+
+:root {
+  --ce-bundle-accent: var(--ce-accent-color, #F95738);
+  --ce-bundle-bg: #FFF5F2;
+  --ce-bundle-bg: color-mix(in srgb, var(--ce-bundle-accent, #F95738) 6%, #ffffff);
+  --ce-bundle-border: #FDE2D9;
+  --ce-bundle-border: color-mix(in srgb, var(--ce-bundle-accent, #F95738) 22%, #ffffff);
+  --ce-bundle-text: var(--ce-bundle-accent, #D9381E);
+  --ce-bundle-green: #108043;
+  --ce-bundle-green-bg: #ECFDF5;
+  --ce-bundle-green-border: #A7F3D0;
+}
+
+/* 1. Top Tier Progress Banner */
+.ce-bundle-banner-wrapper {
+  margin: 10px 16px 8px 16px;
+  box-sizing: border-box;
+  animation: ceBundleSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ce-bundle-banner {
+  background: var(--ce-bundle-bg);
+  border: 1px solid var(--ce-bundle-border);
+  border-radius: 14px;
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--ce-bundle-accent, #F95738) 12%, transparent);
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.ce-bundle-banner:hover {
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--ce-bundle-accent, #F95738) 18%, transparent);
+  border-color: color-mix(in srgb, var(--ce-bundle-accent, #F95738) 35%, #ffffff);
+}
+
+.ce-bundle-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ce-bundle-banner-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ce-bundle-accent, #F95738) 14%, transparent);
+  color: var(--ce-bundle-accent, #F95738);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ce-bundle-accent, #F95738) 15%, transparent);
+}
+
+.ce-bundle-banner-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.ce-bundle-banner-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ce-bundle-banner-text {
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ce-bundle-text, var(--ce-bundle-accent, #D9381E));
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  display: block;
+}
+
+.ce-bundle-progress-track {
+  width: 100%;
+  height: 5px;
+  border-radius: 9999px;
+  background: #FFFFFF;
+  border: 1px solid var(--ce-bundle-border);
+  overflow: hidden;
+  margin-top: 5px;
+  position: relative;
+}
+
+.ce-bundle-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--ce-bundle-accent, #F95738);
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ce-bundle-unlocked-badge {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #FFFFFF;
+  background: linear-gradient(135deg, var(--ce-bundle-accent, #108043) 0%, color-mix(in srgb, var(--ce-bundle-accent, #108043) 80%, #000000) 100%);
+  padding: 3px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--ce-bundle-accent, #108043) 30%, transparent);
+  flex-shrink: 0;
+  animation: ceBadgePop 0.35s ease-out;
+}
+
+/* 2. Cart Item Discount Badges */
+.ce-bundle-badge-wrapper {
+  margin-top: 3px;
+  margin-bottom: 2px;
+  display: block;
+  width: fit-content;
+}
+
+.ce-bundle-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: color-mix(in srgb, var(--ce-bundle-accent, #F95738) 10%, #ffffff);
+  color: var(--ce-bundle-accent, #F95738);
+  border: 1px solid color-mix(in srgb, var(--ce-bundle-accent, #F95738) 25%, #ffffff);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ce-bundle-accent, #F95738) 10%, transparent);
+  animation: ceBadgePop 0.25s ease-out;
+}
+
+.ce-bundle-badge svg {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+}
+
+/* 3. Product Line Price Strikethrough & Green Savings */
+.ce-price-block {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  gap: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.ce-old-price {
+  text-decoration: line-through !important;
+  color: #94A3B8 !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  display: block !important;
+}
+
+.ce-discounted-price {
+  color: #108043 !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  display: block !important;
+}
+
+/* 4. Cart Drawer / Cart Page Subtotal Savings Callout */
+.ce-bundle-savings-summary {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  background: #F0FDF4 !important;
+  border: 1px solid #BBF7D0 !important;
+  border-radius: 10px !important;
+  padding: 8px 12px !important;
+  margin: 8px 0 10px 0 !important;
+  box-sizing: border-box !important;
+  animation: ceBundleSlideDown 0.3s ease-out;
+}
+
+.ce-savings-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #166534 !important;
+}
+
+.ce-savings-left svg {
+  color: #15803D !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.ce-savings-val {
+  font-size: 12.5px !important;
+  font-weight: 800 !important;
+  color: #15803D !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* Animations */
+@keyframes ceBundleSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ceBadgePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  70% {
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

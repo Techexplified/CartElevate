@@ -1,0 +1,366 @@
+/* CartElevate — Feature: Post-Purchase / Pre-Checkout Upsell Modal */
+
+:root {
+  --ce-ppo-accent: var(--ce-accent-color, #F95738);
+}
+
+.ce-ppo-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  border: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  color: inherit;
+  z-index: 2147483647 !important;
+  background: rgba(15, 23, 42, 0.72) !important;
+  backdrop-filter: blur(8px) saturate(130%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(130%) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+  animation: cePpoFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: auto !important;
+}
+
+/* The dialog itself is our dim layer, so hide the native one to avoid double-dimming */
+.ce-ppo-backdrop::backdrop {
+  background: transparent !important;
+}
+
+.ce-ppo-modal {
+  position: relative;
+  background: #ffffff;
+  border-radius: 24px;
+  border: 1.5px solid color-mix(in srgb, var(--ce-ppo-accent, #F95738) 35%, transparent);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.95),
+    0 0 0 4px color-mix(in srgb, var(--ce-ppo-accent, #F95738) 16%, transparent),
+    0 25px 60px -12px rgba(0, 0, 0, 0.55),
+    0 0 45px color-mix(in srgb, var(--ce-ppo-accent, #F95738) 25%, transparent);
+  width: 100%;
+  max-width: 360px;
+  padding: 28px 22px 22px;
+  text-align: center;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #0f172a;
+  animation: cePpoScaleUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  overflow: hidden;
+}
+
+/* Glowing top highlight bar */
+.ce-ppo-modal::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--ce-ppo-accent, #F95738) 75%, #ffffff) 0%, var(--ce-ppo-accent, #F95738) 50%, color-mix(in srgb, var(--ce-ppo-accent, #F95738) 80%, #000000) 100%);
+}
+
+@keyframes cePpoFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes cePpoScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.ce-ppo-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+  z-index: 2;
+}
+
+.ce-ppo-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+  transform: rotate(90deg);
+}
+
+.ce-ppo-pill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ce-ppo-accent, #F95738);
+  background: color-mix(in srgb, var(--ce-ppo-accent, #F95738) 10%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--ce-ppo-accent, #F95738) 25%, #ffffff);
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-bottom: 8px;
+}
+
+.ce-ppo-timer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ce-ppo-accent, #F95738);
+  margin-bottom: 6px;
+  background: color-mix(in srgb, var(--ce-ppo-accent, #F95738) 10%, transparent);
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--ce-ppo-accent, #F95738) 22%, transparent);
+}
+
+.ce-ppo-timer-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ce-ppo-accent, #F95738);
+  animation: cePpoPulse 1.4s infinite;
+}
+
+@keyframes cePpoPulse {
+  0% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ce-ppo-accent, #F95738) 70%, transparent);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--ce-ppo-accent, #F95738) 0%, transparent);
+  }
+  100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ce-ppo-accent, #F95738) 0%, transparent);
+  }
+}
+
+.ce-ppo-headline {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #0f172a;
+  margin: 6px 0 14px;
+  letter-spacing: -0.015em;
+}
+
+.ce-ppo-image-box {
+  position: relative;
+  background: radial-gradient(circle at center, #ffffff 0%, color-mix(in srgb, var(--ce-ppo-accent, #F95738) 4%, #ffffff) 100%);
+  border-radius: 18px;
+  padding: 16px;
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  border: 1px solid color-mix(in srgb, var(--ce-ppo-accent, #F95738) 12%, #ffffff);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.ce-ppo-discount-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: linear-gradient(135deg, var(--ce-ppo-accent, #F95738) 0%, color-mix(in srgb, var(--ce-ppo-accent, #F95738) 85%, #000000) 100%);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border-radius: 8px;
+  box-shadow: 0 3px 8px color-mix(in srgb, var(--ce-ppo-accent, #F95738) 35%, transparent);
+}
+
+.ce-ppo-image {
+  max-width: 125px;
+  max-height: 115px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.08));
+  transition: transform 0.25s ease;
+}
+
+.ce-ppo-image:hover {
+  transform: scale(1.05);
+}
+
+.ce-ppo-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+}
+
+.ce-ppo-pricing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.ce-ppo-old-price {
+  text-decoration: line-through;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.ce-ppo-new-price {
+  font-weight: 800;
+  color: var(--ce-ppo-accent, #F95738);
+  font-size: 17px;
+}
+
+.ce-ppo-save-tag {
+  background: color-mix(in srgb, var(--ce-ppo-accent, #F95738) 10%, #ffffff);
+  color: var(--ce-ppo-accent, #F95738);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--ce-ppo-accent, #F95738) 22%, #ffffff);
+}
+
+.ce-ppo-btn-add {
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 14px;
+  border: none;
+  background: var(--ce-ppo-accent, #F95738);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--ce-ppo-accent, #F95738) 40%, transparent), 0 2px 6px color-mix(in srgb, var(--ce-ppo-accent, #F95738) 25%, transparent);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  letter-spacing: -0.01em;
+}
+
+.ce-ppo-btn-add:hover {
+  background: color-mix(in srgb, var(--ce-ppo-accent, #F95738) 88%, #000000);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--ce-ppo-accent, #F95738) 50%, transparent), 0 3px 8px color-mix(in srgb, var(--ce-ppo-accent, #F95738) 30%, transparent);
+}
+
+.ce-ppo-btn-add:active {
+  transform: scale(0.98);
+}
+
+.ce-ppo-btn-add:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.ce-ppo-btn-skip {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 12px;
+  display: inline-block;
+  padding: 6px 12px;
+  transition: color 0.15s ease;
+  text-decoration: none;
+}
+
+.ce-ppo-btn-skip:hover {
+  color: #1e293b;
+  text-decoration: underline;
+}
+
+/* Spinner for button loading state */
+.ce-ppo-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: cePpoSpin 0.6s linear infinite;
+}
+
+@keyframes cePpoSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Cart Line Item Discount Highlight for Post-Purchase upsell item */
+.ce-ppo-cart-price-block {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  gap: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.ce-ppo-cart-old-price {
+  text-decoration: line-through !important;
+  color: #94a3b8 !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+}
+
+.ce-ppo-cart-new-price {
+  color: var(--ce-ppo-accent, #F95738) !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+}
+
+.ce-ppo-cart-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.02em !important;
+  color: var(--ce-ppo-accent, #F95738) !important;
+  background: color-mix(in srgb, var(--ce-ppo-accent, #F95738) 10%, #ffffff) !important;
+  border: 1px solid color-mix(in srgb, var(--ce-ppo-accent, #F95738) 25%, #ffffff) !important;
+  padding: 1px 6px !important;
+  border-radius: 4px !important;
+  margin-top: 2px !important;
+}

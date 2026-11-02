@@ -95,24 +95,32 @@ cart-drawer-items,
   align-items: center !important;
   justify-content: center !important;
   vertical-align: middle !important;
-  margin-right: 12px !important;
+  margin-right: 10px !important;
   flex-shrink: 0 !important;
 }
 
-/* Rounded Logo Badge */
+/* Custom Logo / Icon Badge (Clean display without artificial background frame) */
 .ce-logo-badge {
-  width: 90px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   height: 28px !important;
-  background: #ffffff !important;
-  border-radius: 9999px !important;
-  padding: 3px 8px !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
-  overflow: hidden !important;
+  max-height: 28px !important;
+  width: auto !important;
+  max-width: 100px !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
 }
 
 .ce-logo-badge img {
-  width: 100% !important;
-  height: 100% !important;
+  height: auto !important;
+  max-height: 28px !important;
+  width: auto !important;
+  max-width: 100px !important;
   object-fit: contain !important;
   display: block !important;
 }

@@ -33,7 +33,7 @@ export default function App() {
       {/* Shopify App Bridge nav menu rendered in the Shopify Admin sidebar */}
       <s-app-nav>
         <s-link href="/app">Dashboard</s-link>
-        <s-link href="/app/settings">Settings</s-link>
+        <s-link href="/app/analytics">Analytics</s-link>
       </s-app-nav>
       <LoadingProvider>
         <main className="min-h-screen bg-white text-slate-900 relative">

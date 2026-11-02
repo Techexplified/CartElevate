@@ -1,0 +1,223 @@
+/* CartElevate — Feature: Protection and Wrapping (Storefront) */
+
+/* ── Container ── */
+.ce-pw-container {
+  margin: 0 0 12px 0;
+  padding: 10px 14px;
+  background-color: #F8F9FA;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  font-family: inherit;
+  color: #1E293B;
+  box-sizing: border-box;
+}
+
+/* If mounted directly in footer (common Shopify theme pattern), add spacing */
+#ce-protection-wrapping-root {
+  display: block;
+}
+
+/* ── Each checkbox row ── */
+.ce-pw-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+  user-select: none;
+}
+
+.ce-pw-item + .ce-pw-item {
+  border-top: 1px solid #EDF2F7;
+  margin-top: 5px;
+  padding-top: 9px;
+}
+
+/* ── Label group (checkbox + icon + text) ── */
+.ce-pw-label-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+/* ── Checkbox input ── */
+.ce-pw-checkbox {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  cursor: pointer;
+  accent-color: var(--ce-accent-color, #F95738);
+  flex-shrink: 0;
+  margin: 0;
+}
+
+/* ── Icon ── */
+.ce-pw-icon {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  flex-shrink: 0;
+}
+
+.ce-pw-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ── Label text ── */
+.ce-pw-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1E293B;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Info icon + tooltip ── */
+.ce-pw-info-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ce-pw-info-btn {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font-size: 14px;
+  color: #94A3B8;
+  cursor: pointer;
+  line-height: 1;
+  border-radius: 50%;
+  transition: color 0.15s ease;
+  -webkit-appearance: none;
+}
+
+.ce-pw-info-btn:hover {
+  color: #334155;
+}
+
+.ce-pw-tooltip {
+  display: none;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  width: 200px;
+  padding: 8px 10px;
+  background-color: #0F172A;
+  color: #F8FAFC;
+  font-size: 11px;
+  line-height: 1.45;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  z-index: 99999;
+  pointer-events: none;
+  white-space: normal;
+}
+
+.ce-pw-info-wrap:hover .ce-pw-tooltip {
+  display: block;
+  animation: cePwFadeIn 0.12s ease-out forwards;
+}
+
+/* ── Gift note textarea ── */
+.ce-pw-gift-note-wrapper {
+  margin-top: 7px;
+  padding-left: 24px;
+  transition: opacity 0.2s ease;
+}
+
+.ce-pw-gift-note-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #1E293B;
+  background-color: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  resize: vertical;
+  min-height: 54px;
+  outline: none;
+  transition: border-color 0.15s ease;
+  display: block;
+}
+
+.ce-pw-gift-note-input:focus {
+  border-color: var(--ce-accent-color, #F95738);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-accent-color, #F95738) 15%, transparent);
+}
+
+/* ── Loading / busy state ── */
+.ce-pw-loading-indicator {
+  transition: opacity 0.15s;
+}
+/* ── New Changes for slow loading issue ── */
+.ce-pw-loading-indicator .ce-pw-item {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.ce-pw-loading-indicator .ce-pw-gift-note-wrapper {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* ── Checkout button loading state ── */
+.ce-pw-btn-loading {
+  position: relative !important;
+  opacity: 0.8 !important;
+  cursor: wait !important;
+  pointer-events: none !important;
+}
+
+.ce-pw-spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  border-top-color: currentColor;
+  animation: cePwSpin 0.65s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+@keyframes cePwSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Animation ── */
+@keyframes cePwFadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Hide service products from theme's cart drawer line-items list (Option 1) ── */
+.cart-item:has(a[href*="cartelevate-"]),
+.cart-item:has(a[href*="Package%20Protection"]),
+.cart-item:has(a[href*="Gift%20Wrapping"]),
+.cart-item:has([data-cart-item-title*="[CartElevate]"]),
+.cart-drawer__item:has(a[href*="cartelevate-"]),
+.cart-drawer__item:has([data-cart-item-title*="[CartElevate]"]),
+tr.cart-item:has(a[href*="cartelevate-"]),
+li.cart-item:has(a[href*="cartelevate-"]),
+[id*="CartDrawer-Item"]:has(a[href*="cartelevate-"]),
+[id*="CartDrawer-Item"]:has([data-cart-item-title*="[CartElevate]"]),
+[data-cart-item]:has(a[href*="cartelevate-"]),
+.line-item:has(a[href*="cartelevate-"]),
+[data-line-item]:has(a[href*="cartelevate-"]) {
+  display: none !important;
+}
