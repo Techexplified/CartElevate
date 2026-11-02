@@ -1788,10 +1788,24 @@ export default function ShippingAndFreeGiftProgressBarPage() {
 
                     {/* Unlocked gift celebratory pill */}
                     {(goalType === "free_gift" || goalType === "both") && subtotal >= numGift && giftProduct.title && (
-                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200/80 text-[11.5px] text-emerald-800 font-medium">
+                      <div
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11.5px] font-medium transition-all"
+                        style={{
+                          backgroundColor: `color-mix(in srgb, ${accentColor} 8%, #ffffff)`,
+                          border: `1px solid color-mix(in srgb, ${accentColor} 25%, #ffffff)`,
+                          color: `color-mix(in srgb, ${accentColor} 85%, #000000)`,
+                        }}
+                      >
                         <span>🎁</span>
                         <span className="truncate">
-                          Free Gift: <strong className="font-bold text-emerald-900">{giftQuantity > 1 ? `${giftQuantity}x ` : ""}{giftProduct.title}</strong> included with order
+                          Free Gift:{" "}
+                          <strong
+                            className="font-bold"
+                            style={{ color: `color-mix(in srgb, ${accentColor} 95%, #000000)` }}
+                          >
+                            {giftQuantity > 1 ? `${giftQuantity}x ` : ""}{giftProduct.title}
+                          </strong>{" "}
+                          included with order
                         </span>
                       </div>
                     )}
@@ -1949,12 +1963,27 @@ export default function ShippingAndFreeGiftProgressBarPage() {
 
                     {/* Free Gift checkout tag */}
                     {(goalType === "free_gift" || goalType === "both") && subtotal >= numGift && giftProduct.title && (
-                      <div className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 font-medium animate-fadeIn">
+                      <div
+                        className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg font-medium animate-fadeIn"
+                        style={{
+                          backgroundColor: `color-mix(in srgb, ${accentColor} 8%, #ffffff)`,
+                          border: `1px solid color-mix(in srgb, ${accentColor} 22%, #ffffff)`,
+                          color: `color-mix(in srgb, ${accentColor} 85%, #000000)`,
+                        }}
+                      >
                         <span className="flex items-center gap-1.5 truncate">
                           <span>🎁</span>
                           <span className="truncate">Free Gift: <strong>{giftQuantity > 1 ? `${giftQuantity}x ` : ""}{giftProduct.title}</strong></span>
                         </span>
-                        <span className="font-bold text-emerald-800 tracking-wide text-[10px] bg-emerald-100/80 px-1.5 py-0.5 rounded shrink-0">ORDER ATTRIBUTE</span>
+                        <span
+                          className="font-bold tracking-wide text-[10px] px-1.5 py-0.5 rounded shrink-0"
+                          style={{
+                            backgroundColor: `color-mix(in srgb, ${accentColor} 18%, #ffffff)`,
+                            color: `color-mix(in srgb, ${accentColor} 90%, #000000)`,
+                          }}
+                        >
+                          ORDER ATTRIBUTE
+                        </span>
                       </div>
                     )}
 

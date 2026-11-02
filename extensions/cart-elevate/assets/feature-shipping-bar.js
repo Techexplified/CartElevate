@@ -208,7 +208,7 @@ function renderProgressBar(detail){
   var giftQty = Number(pb.giftQuantity) || 1;
   var giftLabel = (giftQty > 1 ? giftQty + 'x ' : '') + (pb.giftProductTitle || 'Special Store Gift');
   var giftBadgeInner = '🎁 <span>Free Gift: <strong>' + giftLabel + '</strong> included with your order</span>';
-  var giftBadgeHtml = isGiftUnlocked ? '<div class="ce-pb-gift-pill">' + giftBadgeInner + '</div>' : '';
+  var giftBadgeHtml = isGiftUnlocked ? '<div class="ce-pb-gift-pill" style="--ce-accent-color:' + ac + ';">' + giftBadgeInner + '</div>' : '';
 
   // Update in place smoothly if card already exists
   var existingText = mount.querySelector('.ce-pb-text');
@@ -240,13 +240,17 @@ function renderProgressBar(detail){
     if(isGiftUnlocked && !existingBadge){
       var badgeEl = document.createElement('div');
       badgeEl.className = 'ce-pb-gift-pill';
+      badgeEl.style.setProperty('--ce-accent-color', ac);
       badgeEl.innerHTML = giftBadgeInner;
       var card = mount.querySelector('.ce-progress-bar-card');
       if(card) card.appendChild(badgeEl);
     } else if(!isGiftUnlocked && existingBadge){
       existingBadge.remove();
-    } else if(isGiftUnlocked && existingBadge && existingBadge.innerHTML !== giftBadgeInner){
-      existingBadge.innerHTML = giftBadgeInner;
+    } else if(isGiftUnlocked && existingBadge){
+      if(existingBadge.innerHTML !== giftBadgeInner){
+        existingBadge.innerHTML = giftBadgeInner;
+      }
+      existingBadge.style.setProperty('--ce-accent-color', ac);
     }
     return;
   }
