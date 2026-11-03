@@ -183,6 +183,11 @@
   pointer-events: none !important;
 }
 
+.ce-pw-item.ce-pw-loading {
+  opacity: 0.6 !important;
+  pointer-events: none !important;
+}
+
 .ce-pw-spinner {
   display: inline-block;
   width: 13px;

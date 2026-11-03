@@ -206,11 +206,122 @@ async function publishProductToOnlineStore(admin, productId, session) {
 /**
  * Create a single service product and return { productId, variantId }.
  * Also publishes it to Online Store so /cart/add.js works on the storefront.
+ * Uses REST API first (handles variants with requires_shipping: false in one atomic call),
+ * falling back to GraphQL productCreate without variants in payload (API 2024-04+ compatible).
  */
-async function createServiceProduct(admin, { title, tag, description }) {
+async function createServiceProduct(admin, { title, tag, description }, session = null) {
+  let activeSession = session;
+  if (!activeSession) {
+    try {
+      const prismaModule = await import("../db.server.js");
+      const prisma = prismaModule.default || prismaModule;
+      activeSession = await prisma.session.findFirst();
+    } catch (_e) { /* ignore */ }
+  }
+
+  // Method 1: Try REST API (most reliable across all Shopify API versions)
+  if (activeSession?.shop && activeSession?.accessToken) {
+    try {
+      const restRes = await fetch(`https://${activeSession.shop}/admin/api/2025-01/products.json`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Shopify-Access-Token": activeSession.accessToken,
+        },
+        body: JSON.stringify({
+          product: {
+            title,
+            vendor: "CartElevate",
+            product_type: "Service",
+            status: "active",
+            published: true,
+            tags: `_cartelevate_service, ${tag}`,
+            body_html: `<p>${description}</p>`,
+            variants: [
+              {
+                price: "0.00",
+                requires_shipping: false,
+                taxable: false,
+                inventory_management: null,
+                inventory_policy: "continue",
+              },
+            ],
+          },
+        }),
+      });
+
+      const restJson = await restRes.json();
+      const p = restJson?.product;
+      if (p?.id) {
+        const variantIdNum = p.variants?.[0]?.id;
+        const productId = `gid://shopify/Product/${p.id}`;
+        const variantId = variantIdNum ? `gid://shopify/ProductVariant/${variantIdNum}` : null;
+        console.log(`[CartElevate] Created service product "${title}" via REST: ${productId}, variant: ${variantId}`);
+        await publishProductToOnlineStore(admin, productId, activeSession);
+        return { productId, variantId };
+      }
+      if (restJson?.errors) {
+        console.warn(`[CartElevate] REST productCreate errors for "${title}":`, JSON.stringify(restJson.errors));
+      }
+    } catch (restErr) {
+      console.warn(`[CartElevate] REST product create failed for "${title}":`, restErr.message);
+    }
+  }
+
+  // Method 2: Modern GraphQL productCreate (API 2024-04+)
+  // Note: productCreate in 2024-04+ takes `product: ProductCreateInput!` and does NOT accept `variants` in input.
   try {
-    const createRes = await admin.graphql(`
-      mutation CreateServiceProduct($input: ProductInput!) {
+    const modernRes = await admin.graphql(`
+      mutation CreateServiceProductModern($product: ProductCreateInput!) {
+        productCreate(product: $product) {
+          product {
+            id
+            variants(first: 1) {
+              edges {
+                node {
+                  id
+                  price
+                }
+              }
+            }
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `, {
+      variables: {
+        product: {
+          title,
+          vendor: "CartElevate",
+          productType: "Service",
+          status: "ACTIVE",
+          tags: ["_cartelevate_service", tag],
+          descriptionHtml: `<p>${description}</p>`,
+        },
+      },
+    });
+
+    const modernJson = await modernRes.json();
+    const modernErrors = modernJson?.data?.productCreate?.userErrors || [];
+    const modernProduct = modernJson?.data?.productCreate?.product;
+
+    if (modernProduct?.id && modernErrors.length === 0) {
+      const variantId = modernProduct.variants?.edges?.[0]?.node?.id || null;
+      console.log(`[CartElevate] Created service product "${title}" via GraphQL modern: ${modernProduct.id}, variant: ${variantId}`);
+      await publishProductToOnlineStore(admin, modernProduct.id, activeSession);
+      return { productId: modernProduct.id, variantId };
+    }
+  } catch (modernErr) {
+    console.warn(`[CartElevate] GraphQL modern productCreate failed for "${title}":`, modernErr.message);
+  }
+
+  // Method 3: Fallback GraphQL productCreate(input: $input) without variants in payload
+  try {
+    const legacyRes = await admin.graphql(`
+      mutation CreateServiceProductLegacy($input: ProductInput!) {
         productCreate(input: $input) {
           product {
             id
@@ -238,42 +349,23 @@ async function createServiceProduct(admin, { title, tag, description }) {
           status: "ACTIVE",
           tags: ["_cartelevate_service", tag],
           descriptionHtml: `<p>${description}</p>`,
-          // Price is $0 — CartElevate JS computes the actual amount client-side.
-          // A $0.00 price is intentional; the actual charge comes from a fee variant
-          // that the merchant may optionally set, or via Shopify Functions (Plus).
-          variants: [
-            {
-              price: "0.00",
-              requiresShipping: false,
-              taxable: false,
-              inventoryManagement: null,
-              inventoryPolicy: "continue",
-            },
-          ],
         },
       },
     });
 
-    const createJson = await createRes.json();
-    const userErrors = createJson?.data?.productCreate?.userErrors || [];
-    if (userErrors.length > 0) {
-      console.warn(`[CartElevate] productCreate userErrors for "${title}":`, JSON.stringify(userErrors));
-      return null;
+    const legacyJson = await legacyRes.json();
+    const legacyProduct = legacyJson?.data?.productCreate?.product;
+    if (legacyProduct?.id) {
+      const variantId = legacyProduct.variants?.edges?.[0]?.node?.id || null;
+      console.log(`[CartElevate] Created service product "${title}" via GraphQL legacy: ${legacyProduct.id}, variant: ${variantId}`);
+      await publishProductToOnlineStore(admin, legacyProduct.id, activeSession);
+      return { productId: legacyProduct.id, variantId };
     }
-
-    const product = createJson?.data?.productCreate?.product;
-    if (!product?.id) return null;
-
-    const variantId = product.variants?.edges?.[0]?.node?.id || null;
-
-    // Publish to Online Store so /cart/add.js accepts it
-    await publishProductToOnlineStore(admin, product.id);
-
-    return { productId: product.id, variantId };
-  } catch (err) {
-    console.warn(`[CartElevate] Failed to create service product "${title}":`, err.message);
-    return null;
+  } catch (legacyErr) {
+    console.warn(`[CartElevate] GraphQL legacy productCreate failed for "${title}":`, legacyErr.message);
   }
+
+  return null;
 }
 
 /**
@@ -283,86 +375,157 @@ async function createServiceProduct(admin, { title, tag, description }) {
 export async function ensureServiceProducts(admin, currentProductIds = {}, session = null) {
   const ids = { ...currentProductIds };
 
+  let activeSession = session;
+  if (!activeSession) {
+    try {
+      const prismaModule = await import("../db.server.js");
+      const prisma = prismaModule.default || prismaModule;
+      activeSession = await prisma.session.findFirst();
+    } catch (_e) { /* ignore */ }
+  }
+
   try {
-    // 1. Query existing products already tagged with CartElevate service tags
-    const queryRes = await admin.graphql(`
-      query FindServiceProducts {
-        products(first: 10, query: "vendor:CartElevate") {
-          edges {
-            node {
+    // 1. If product IDs already exist, verify they are still active in Shopify
+    if (ids.protectionProductId) {
+      try {
+        const verifyRes = await admin.graphql(`
+          query VerifyProduct($id: ID!) {
+            product(id: $id) {
               id
-              title
               status
-              tags
               publishedAt
               variants(first: 1) {
-                edges {
-                  node {
-                    id
-                    price
+                edges { node { id } }
+              }
+            }
+          }
+        `, { variables: { id: ids.protectionProductId } });
+        const verifyJson = await verifyRes.json();
+        const p = verifyJson?.data?.product;
+        if (p?.id) {
+          ids.protectionProductId = p.id;
+          ids.protectionVariantId = p.variants?.edges?.[0]?.node?.id || ids.protectionVariantId;
+          if (!p.publishedAt) {
+            await publishProductToOnlineStore(admin, p.id, activeSession);
+          }
+        } else {
+          ids.protectionProductId = null;
+          ids.protectionVariantId = null;
+        }
+      } catch (e) {
+        ids.protectionProductId = null;
+        ids.protectionVariantId = null;
+      }
+    }
+
+    if (ids.giftWrappingProductId) {
+      try {
+        const verifyRes = await admin.graphql(`
+          query VerifyProduct($id: ID!) {
+            product(id: $id) {
+              id
+              status
+              publishedAt
+              variants(first: 1) {
+                edges { node { id } }
+              }
+            }
+          }
+        `, { variables: { id: ids.giftWrappingProductId } });
+        const verifyJson = await verifyRes.json();
+        const p = verifyJson?.data?.product;
+        if (p?.id) {
+          ids.giftWrappingProductId = p.id;
+          ids.giftWrappingVariantId = p.variants?.edges?.[0]?.node?.id || ids.giftWrappingVariantId;
+          if (!p.publishedAt) {
+            await publishProductToOnlineStore(admin, p.id, activeSession);
+          }
+        } else {
+          ids.giftWrappingProductId = null;
+          ids.giftWrappingVariantId = null;
+        }
+      } catch (e) {
+        ids.giftWrappingProductId = null;
+        ids.giftWrappingVariantId = null;
+      }
+    }
+
+    // 2. Query existing products tagged with CartElevate service tags or titles
+    if (!ids.protectionProductId || !ids.protectionVariantId || !ids.giftWrappingProductId || !ids.giftWrappingVariantId) {
+      const queryRes = await admin.graphql(`
+        query FindServiceProducts {
+          products(first: 20, query: "tag:cartelevate-protection OR tag:cartelevate-gift-wrapping OR vendor:CartElevate OR title:'Package Protection' OR title:'Gift Wrapping'") {
+            edges {
+              node {
+                id
+                title
+                status
+                tags
+                publishedAt
+                variants(first: 1) {
+                  edges {
+                    node {
+                      id
+                      price
+                    }
                   }
                 }
               }
             }
           }
         }
-      }
-    `);
-    const queryJson = await queryRes.json();
-    const edges = queryJson?.data?.products?.edges || [];
+      `);
+      const queryJson = await queryRes.json();
+      const edges = queryJson?.data?.products?.edges || [];
 
-    for (const edge of edges) {
-      const p = edge.node;
-      const tags = Array.isArray(p.tags) ? p.tags : [];
-      const firstVariantId = p.variants?.edges?.[0]?.node?.id || null;
+      for (const edge of edges) {
+        const p = edge.node;
+        const tags = Array.isArray(p.tags) ? p.tags : [];
+        const firstVariantId = p.variants?.edges?.[0]?.node?.id || null;
 
-      if (tags.includes("cartelevate-protection") || p.title.includes("Package Protection")) {
-        ids.protectionProductId = p.id;
-        ids.protectionVariantId = firstVariantId;
-
-        // Re-publish if not already published
-        if (!p.publishedAt) {
-          await publishProductToOnlineStore(admin, p.id, session);
+        if ((!ids.protectionProductId || !ids.protectionVariantId) && (tags.includes("cartelevate-protection") || p.title.includes("Package Protection"))) {
+          ids.protectionProductId = p.id;
+          ids.protectionVariantId = firstVariantId;
+          if (!p.publishedAt) {
+            await publishProductToOnlineStore(admin, p.id, activeSession);
+          }
         }
-      }
-      if (tags.includes("cartelevate-gift-wrapping") || p.title.includes("Gift Wrapping")) {
-        ids.giftWrappingProductId = p.id;
-        ids.giftWrappingVariantId = firstVariantId;
-
-        if (!p.publishedAt) {
-          await publishProductToOnlineStore(admin, p.id, session);
+        if ((!ids.giftWrappingProductId || !ids.giftWrappingVariantId) && (tags.includes("cartelevate-gift-wrapping") || p.title.includes("Gift Wrapping"))) {
+          ids.giftWrappingProductId = p.id;
+          ids.giftWrappingVariantId = firstVariantId;
+          if (!p.publishedAt) {
+            await publishProductToOnlineStore(admin, p.id, activeSession);
+          }
         }
       }
     }
 
-    // 2. Create Package Protection product if missing
+    // 3. Create Package Protection product if missing
     if (!ids.protectionProductId || !ids.protectionVariantId) {
       console.log("[CartElevate] Creating [CartElevate] Package Protection service product...");
       const result = await createServiceProduct(admin, {
         title: "[CartElevate] Package Protection",
         tag: "cartelevate-protection",
         description: "CartElevate automated package protection guarantee against loss, theft, or damage.",
-      });
+      }, activeSession);
       if (result) {
         ids.protectionProductId = result.productId;
         ids.protectionVariantId = result.variantId;
-        await publishProductToOnlineStore(admin, result.productId, session);
         console.log(`[CartElevate] Package Protection created: productId=${result.productId} variantId=${result.variantId}`);
       }
     }
 
-    // 3. Create Gift Wrapping product if missing
+    // 4. Create Gift Wrapping product if missing
     if (!ids.giftWrappingProductId || !ids.giftWrappingVariantId) {
       console.log("[CartElevate] Creating [CartElevate] Gift Wrapping service product...");
       const result = await createServiceProduct(admin, {
         title: "[CartElevate] Gift Wrapping",
         tag: "cartelevate-gift-wrapping",
         description: "CartElevate professional gift wrapping service for your order.",
-      });
+      }, activeSession);
       if (result) {
         ids.giftWrappingProductId = result.productId;
         ids.giftWrappingVariantId = result.variantId;
-        await publishProductToOnlineStore(admin, result.productId, session);
         console.log(`[CartElevate] Gift Wrapping created: productId=${result.productId} variantId=${result.variantId}`);
       }
     }

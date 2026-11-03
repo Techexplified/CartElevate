@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+/* eslint-disable react/prop-types, jsx-a11y/label-has-associated-control */
+import { useState, useMemo } from "react";
 import { useLoaderData, useNavigate, useFetcher } from "react-router";
 import { authenticate } from "../shopify.server";
 import {
@@ -27,7 +28,19 @@ const DEFAULT_CONFIG = {
 export const loader = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
   const shop = session.shop;
-  const config = await getProtectionWrappingConfig(admin);
+  let config = await getProtectionWrappingConfig(admin);
+
+  // Ensure service products exist whenever admin page is opened
+  if (!config.serviceProductIds?.protectionVariantId || !config.serviceProductIds?.giftWrappingVariantId) {
+    try {
+      const saveRes = await saveProtectionWrappingConfig({ admin, session, config });
+      if (saveRes?.config) {
+        config = saveRes.config;
+      }
+    } catch (e) {
+      console.warn("[CartElevate] Failed to auto-provision in admin loader:", e.message);
+    }
+  }
 
   return {
     shop,

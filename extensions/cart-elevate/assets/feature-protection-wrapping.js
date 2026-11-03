@@ -244,25 +244,65 @@
     });
   }
 
-  /* ─────────────── Fallback Config Fetch ─────────────── */
+  /* ─────────────── Resolve App Base URL & Fallback Config Fetch ─────────────── */
 
-  function fetchConfigFallback(cb) {
-    if (getConfig()) {
-      if (cb) cb(getConfig());
+  function resolveAppBaseUrl() {
+    if (window.CartElevateAppUrl && typeof window.CartElevateAppUrl === 'string' && window.CartElevateAppUrl.indexOf('http') === 0) {
+      return window.CartElevateAppUrl.replace(/\/+$/, '');
+    }
+    var rawPW = parse(window.CartElevateProtectionWrapping);
+    if (rawPW && rawPW.appUrl && typeof rawPW.appUrl === 'string' && rawPW.appUrl.indexOf('http') === 0) {
+      return rawPW.appUrl.replace(/\/+$/, '');
+    }
+    var rawPP = parse(window.CartElevatePostPurchase);
+    if (rawPP && rawPP.appUrl && typeof rawPP.appUrl === 'string' && rawPP.appUrl.indexOf('http') === 0) {
+      return rawPP.appUrl.replace(/\/+$/, '');
+    }
+    var rawRec = parse(window.CartElevateRecommendations);
+    if (rawRec && rawRec.appUrl && typeof rawRec.appUrl === 'string' && rawRec.appUrl.indexOf('http') === 0) {
+      return rawRec.appUrl.replace(/\/+$/, '');
+    }
+    var rawSettings = parse(window.CartElevateSettings);
+    if (rawSettings && rawSettings.appUrl && typeof rawSettings.appUrl === 'string' && rawSettings.appUrl.indexOf('http') === 0) {
+      return rawSettings.appUrl.replace(/\/+$/, '');
+    }
+    return 'https://cart-elevate.vercel.app';
+  }
+
+  function fetchConfigFallback(cb, force) {
+    var cur = getConfig();
+    var hasProt = cur && cur.serviceProductIds && cur.serviceProductIds.protectionVariantId;
+    var hasGift = cur && cur.serviceProductIds && cur.serviceProductIds.giftWrappingVariantId;
+
+    if (cur && hasProt && hasGift && !force) {
+      if (cb) cb(cur);
       return;
     }
+
     var shop = window.CartElevateShop || (window.Shopify && window.Shopify.shop);
-    if (!shop) return;
-    fetch('/api/protection-wrapping?shop=' + encodeURIComponent(shop), { cache: 'no-store' })
+    if (!shop) {
+      if (cb) cb(cur);
+      return;
+    }
+
+    var baseUrl = resolveAppBaseUrl();
+    var apiUrl = (baseUrl ? baseUrl : '') + '/api/protection-wrapping?shop=' + encodeURIComponent(shop);
+
+    fetch(apiUrl, { cache: 'no-store' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (d && d.settings) {
           window.CartElevateProtectionWrapping = d.settings;
           if (cb) cb(d.settings);
           triggerCartSync();
+        } else if (cb) {
+          cb(cur);
         }
       })
-      .catch(function () {});
+      .catch(function (err) {
+        console.warn('[CartElevate PW] Config fetch error:', err);
+        if (cb) cb(cur);
+      });
   }
 
   /* ─────────────── Mount: directly before checkout button ─────────────── */
@@ -451,6 +491,19 @@
     var protVarIdNum = getNumericId(svcIds.protectionVariantId);
     var giftVarIdNum = getNumericId(svcIds.giftWrappingVariantId);
 
+    // Proactively fetch and auto-provision service products in background if missing
+    if ((protEnabled && !protVarIdNum) || (giftEnabled && !giftVarIdNum)) {
+      fetchConfigFallback(function (newCfg) {
+        if (newCfg && newCfg.serviceProductIds) {
+          var nProt = getNumericId(newCfg.serviceProductIds.protectionVariantId);
+          var nGift = getNumericId(newCfg.serviceProductIds.giftWrappingVariantId);
+          if ((!protVarIdNum && nProt) || (!giftVarIdNum && nGift)) {
+            triggerCartSync();
+          }
+        }
+      }, true);
+    }
+
     // Count non-service items and detect orphaned service items
     var realItemCount = 0;
     var realCartTotal = 0;
@@ -605,11 +658,7 @@
         console.log('[CartElevate PW] Protection price out of sync (' + actualProtCents + ' vs ' + targetProtCents + '). Updating to $' + protTargetPrice + '...');
 
         var shop = window.CartElevateShop || (window.Shopify && window.Shopify.shop) || '';
-        var appBaseUrl = window.CartElevateAppUrl ||
-                         (config && config.appUrl) ||
-                         (window.CartElevateProtectionWrapping && window.CartElevateProtectionWrapping.appUrl) ||
-                         (window.CartElevateRecommendations && window.CartElevateRecommendations.appUrl) ||
-                         (window.CartElevateSettings && window.CartElevateSettings.appUrl) || '';
+        var appBaseUrl = resolveAppBaseUrl();
         var syncApiPromise = Promise.resolve();
 
         if (shop && appBaseUrl) {
@@ -823,9 +872,24 @@
     if (isOperationBusy) return;
 
     if (isChecked && !numericVarId) {
-      console.warn('[CartElevate PW] No protection variant ID found. Please save settings in CartElevate admin.');
+      console.log('[CartElevate PW] Protection variant ID missing. Auto-resolving from backend API...');
       var chk = document.getElementById('ce-pw-prot-chk');
-      if (chk) chk.checked = false;
+      var itemEl = chk ? chk.closest('.ce-pw-item') : null;
+      if (itemEl) itemEl.classList.add('ce-pw-loading');
+      isOperationBusy = true;
+
+      fetchConfigFallback(function (newCfg) {
+        isOperationBusy = false;
+        if (itemEl) itemEl.classList.remove('ce-pw-loading');
+        var resolvedVarId = newCfg && newCfg.serviceProductIds && getNumericId(newCfg.serviceProductIds.protectionVariantId);
+        if (resolvedVarId) {
+          console.log('[CartElevate PW] Auto-resolved protection variant ID ✓:', resolvedVarId);
+          handleProtectionToggle(true, resolvedVarId, knownLine, displayPrice);
+        } else {
+          console.error('[CartElevate PW] Could not resolve protection variant ID. Please check app configuration.');
+          if (chk) chk.checked = false;
+        }
+      }, true);
       return;
     }
 
@@ -836,12 +900,7 @@
     if (isChecked) {
       console.log('[CartElevate PW] Adding Package Protection variant', numericVarId, 'to cart at price:', displayPrice);
       var shop = window.CartElevateShop || (window.Shopify && window.Shopify.shop) || '';
-      var cfg = getConfig() || {};
-      var appBaseUrl = window.CartElevateAppUrl ||
-                       cfg.appUrl ||
-                       (window.CartElevateProtectionWrapping && window.CartElevateProtectionWrapping.appUrl) ||
-                       (window.CartElevateRecommendations && window.CartElevateRecommendations.appUrl) ||
-                       (window.CartElevateSettings && window.CartElevateSettings.appUrl) || '';
+      var appBaseUrl = resolveAppBaseUrl();
       var priceSyncPromise = Promise.resolve();
 
       if (displayPrice && shop && appBaseUrl) {
@@ -909,11 +968,26 @@
     if (isOperationBusy) return;
 
     if (isChecked && !numericVarId) {
-      console.warn('[CartElevate PW] No gift wrap variant ID found. Please save settings in CartElevate admin.');
+      console.log('[CartElevate PW] Gift wrap variant ID missing. Auto-resolving from backend API...');
       var chk = document.getElementById('ce-pw-gift-chk');
-      if (chk) chk.checked = false;
-      var nw = document.getElementById('ce-pw-gift-note-wrapper');
-      if (nw) nw.style.display = 'none';
+      var itemEl = chk ? chk.closest('.ce-pw-item') : null;
+      if (itemEl) itemEl.classList.add('ce-pw-loading');
+      isOperationBusy = true;
+
+      fetchConfigFallback(function (newCfg) {
+        isOperationBusy = false;
+        if (itemEl) itemEl.classList.remove('ce-pw-loading');
+        var resolvedVarId = newCfg && newCfg.serviceProductIds && getNumericId(newCfg.serviceProductIds.giftWrappingVariantId);
+        if (resolvedVarId) {
+          console.log('[CartElevate PW] Auto-resolved gift wrap variant ID ✓:', resolvedVarId);
+          handleGiftWrapToggle(true, resolvedVarId, knownLine, unitPrice, quantityToAdd);
+        } else {
+          console.error('[CartElevate PW] Could not resolve gift wrap variant ID. Please check app configuration.');
+          if (chk) chk.checked = false;
+          var nw = document.getElementById('ce-pw-gift-note-wrapper');
+          if (nw) nw.style.display = 'none';
+        }
+      }, true);
       return;
     }
 

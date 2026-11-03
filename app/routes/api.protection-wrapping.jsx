@@ -1,3 +1,4 @@
+/* global process */
 import { unauthenticated } from "../shopify.server";
 
 // Public storefront API endpoint for Protection and Gift Wrapping settings
@@ -59,7 +60,33 @@ export const loader = async ({ request }) => {
     if (rawVal) {
       try {
         settings = typeof rawVal === "string" ? JSON.parse(rawVal) : rawVal;
-      } catch (e) {}
+      } catch (_e) { /* ignore */ }
+    }
+
+    // Auto-provision service products if missing on this store
+    const hasProt = Boolean(settings?.serviceProductIds?.protectionVariantId);
+    const hasGift = Boolean(settings?.serviceProductIds?.giftWrappingVariantId);
+
+    if (!hasProt || !hasGift) {
+      try {
+        const prismaModule = await import("../db.server.js");
+        const prisma = prismaModule.default || prismaModule;
+        const session = await prisma.session.findFirst({
+          where: shop ? { shop } : undefined,
+        });
+
+        const { ensureServiceProducts, saveProtectionWrappingConfig } = await import("../services/protection-wrapping.server.js");
+        const serviceProductIds = await ensureServiceProducts(admin, settings.serviceProductIds || {}, session);
+
+        if (serviceProductIds.protectionVariantId || serviceProductIds.giftWrappingVariantId) {
+          settings.serviceProductIds = serviceProductIds;
+          settings.appUrl = process.env.SHOPIFY_APP_URL || "https://cart-elevate.vercel.app";
+          await saveProtectionWrappingConfig({ admin, session, config: settings });
+          console.log(`[CartElevate API] Auto-provisioned service products for ${shop}:`, JSON.stringify(serviceProductIds));
+        }
+      } catch (provErr) {
+        console.warn(`[CartElevate API] Auto-provisioning skipped:`, provErr.message);
+      }
     }
 
     return Response.json({ success: true, settings }, { headers: corsHeaders });
