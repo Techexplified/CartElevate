@@ -165,6 +165,86 @@ export async function syncFreeShippingAutomaticDiscount({
     }
 
     console.error("[CartElevate Discount Sync] Create discount userErrors:", JSON.stringify(userErrors));
+
+    // Fallback: If discount title already exists in the merchant's store, find and update it
+    const hasUniqueTitleErr = userErrors.some((e) => (e.message || "").toLowerCase().includes("unique"));
+    if (hasUniqueTitleErr) {
+      console.log(`[CartElevate Discount Sync] Recovering: searching store for existing discount "${discountTitle}"...`);
+      try {
+        const findRes = await admin.graphql(
+          `#graphql
+          query FindExistingFreeShippingDiscount {
+            automaticDiscountNodes(first: 50) {
+              nodes {
+                id
+                automaticDiscount {
+                  ... on DiscountAutomaticFreeShipping {
+                    title
+                    status
+                  }
+                }
+              }
+            }
+          }`
+        );
+        const findData = await findRes.json();
+        const nodes = findData?.data?.automaticDiscountNodes?.nodes || [];
+        const match = nodes.find((n) => {
+          const t = n.automaticDiscount?.title || "";
+          return t === discountTitle || (t.includes("Free Shipping") && t.includes("CartElevate"));
+        });
+        if (match?.id) {
+          console.log(`[CartElevate Discount Sync] Found existing discount node ${match.id}. Updating threshold to ${formattedThreshold}...`);
+          const updateRes = await admin.graphql(
+            `#graphql
+            mutation RecoverFreeShippingDiscount($id: ID!, $freeShippingAutomaticDiscount: DiscountAutomaticFreeShippingInput!) {
+              discountAutomaticFreeShippingUpdate(id: $id, freeShippingAutomaticDiscount: $freeShippingAutomaticDiscount) {
+                automaticDiscountNode {
+                  id
+                  automaticDiscount {
+                    ... on DiscountAutomaticFreeShipping {
+                      title
+                      status
+                    }
+                  }
+                }
+                userErrors {
+                  field
+                  message
+                }
+              }
+            }`,
+            {
+              variables: {
+                id: match.id,
+                freeShippingAutomaticDiscount: {
+                  title: discountTitle,
+                  minimumRequirement: {
+                    subtotal: {
+                      greaterThanOrEqualToSubtotal: formattedThreshold,
+                    },
+                  },
+                  combinesWith: {
+                    orderDiscounts: true,
+                    productDiscounts: true,
+                  },
+                },
+              },
+            }
+          );
+          const updateData = await updateRes.json();
+          const updatedNode = updateData?.data?.discountAutomaticFreeShippingUpdate?.automaticDiscountNode;
+          if (updatedNode?.id) {
+            console.log(`[CartElevate Discount Sync] Successfully linked and updated existing discount ${updatedNode.id}`);
+            return updatedNode.id;
+          }
+          return match.id;
+        }
+      } catch (findErr) {
+        console.warn("[CartElevate Discount Sync] Fallback recovery error:", findErr.message);
+      }
+    }
+
     return null;
   } catch (createErr) {
     console.error("[CartElevate Discount Sync] Create discount error:", createErr.message);

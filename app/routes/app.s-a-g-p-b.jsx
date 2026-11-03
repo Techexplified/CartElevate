@@ -1724,9 +1724,10 @@ export default function ShippingAndFreeGiftProgressBarPage() {
                     {/* Animated track */}
                     <div className="space-y-1">
                       <div
-                        className="w-full h-2 rounded-full bg-white overflow-hidden relative"
+                        className="w-full h-2 rounded-full bg-white relative"
                         style={{
                           border: `1px solid color-mix(in srgb, ${accentColor} 24%, #ffffff)`,
+                          overflow: "visible",
                         }}
                       >
                         <div
@@ -1736,32 +1737,49 @@ export default function ShippingAndFreeGiftProgressBarPage() {
                             backgroundColor: accentColor,
                           }}
                         />
+                        {goalType === "both" && Math.min(numShipping, numGift) < Math.max(numShipping, numGift) && (
+                          <div
+                            className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full transition-all duration-300 pointer-events-none"
+                            style={{
+                              left: `${Math.max(5, Math.min(95, (Math.min(numShipping, numGift) / Math.max(numShipping, numGift)) * 100))}%`,
+                              backgroundColor: subtotal >= Math.min(numShipping, numGift) ? accentColor : "#ffffff",
+                              border: subtotal >= Math.min(numShipping, numGift)
+                                ? "2px solid #ffffff"
+                                : `2px solid color-mix(in srgb, ${accentColor} 35%, #cbd5e1)`,
+                              boxShadow: subtotal >= Math.min(numShipping, numGift) ? `0 0 0 1.5px ${accentColor}` : "none",
+                              zIndex: 3,
+                            }}
+                          />
+                        )}
                       </div>
 
                       {/* Labels under progress bar */}
-                      <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400 px-0.5">
+                      <div className="relative flex items-center justify-between text-[11px] font-semibold text-slate-400 px-0.5 min-h-[16px]">
                         <span>{currencySymbol}0</span>
                         {goalType === "both" ? (
-                          <div className="flex items-center gap-3">
+                          <>
+                            {Math.min(numShipping, numGift) < Math.max(numShipping, numGift) && (
+                              <span
+                                className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-center transition-colors"
+                                style={{
+                                  left: `${Math.max(5, Math.min(95, (Math.min(numShipping, numGift) / Math.max(numShipping, numGift)) * 100))}%`,
+                                  color: subtotal >= Math.min(numShipping, numGift) ? accentColor : undefined,
+                                  fontWeight: subtotal >= Math.min(numShipping, numGift) ? 700 : 500,
+                                }}
+                              >
+                                {currencySymbol}{Math.min(numShipping, numGift)}
+                              </span>
+                            )}
                             <span
                               className="transition-colors"
                               style={{
-                                color: subtotal >= numShipping ? accentColor : undefined,
-                                fontWeight: subtotal >= numShipping ? 700 : 500,
+                                color: subtotal >= Math.max(numShipping, numGift) ? accentColor : undefined,
+                                fontWeight: subtotal >= Math.max(numShipping, numGift) ? 700 : 500,
                               }}
                             >
-                              {currencySymbol}{numShipping}
+                              {currencySymbol}{Math.max(numShipping, numGift)}
                             </span>
-                            <span
-                              className="transition-colors"
-                              style={{
-                                color: subtotal >= numGift ? accentColor : undefined,
-                                fontWeight: subtotal >= numGift ? 700 : 500,
-                              }}
-                            >
-                              {currencySymbol}{numGift}
-                            </span>
-                          </div>
+                          </>
                         ) : goalType === "free_gift" ? (
                           <span
                             className="transition-colors"

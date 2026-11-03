@@ -193,11 +193,23 @@ function renderProgressBar(detail){
     ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 4.8 0 0 1 12 8a4.8 4.8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg>'
     : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>';
 
+  var firstThreshold = Math.min(sThreshold, gThreshold);
+  var finalThreshold = Math.max(sThreshold, gThreshold);
+  var hasStep = (goalType === 'both' && finalThreshold > 0 && firstThreshold < finalThreshold);
+  var pointPct = 0;
+  if(hasStep){
+    pointPct = Math.max(5, Math.min(95, Math.round((firstThreshold / finalThreshold) * 1000) / 10));
+  }
+  var isFirstReached = effectiveTotal >= firstThreshold;
+  var isFinalReached = effectiveTotal >= finalThreshold;
+
   var markersHtml = '';
-  if(goalType === 'both'){
-    var sCls = effectiveTotal >= sThreshold ? ' style="color:' + ac + '; font-weight:700;"' : '';
-    var gCls = effectiveTotal >= gThreshold ? ' style="color:' + ac + '; font-weight:700;"' : '';
-    markersHtml = '<span>' + sym + '0</span><div style="display:flex;gap:14px;"><span' + sCls + '>' + sym + sThreshold + '</span><span' + gCls + '>' + sym + gThreshold + '</span></div>';
+  if(hasStep){
+    var firstStyle = 'left:' + pointPct + '%; transform:translateX(-50%);' + (isFirstReached ? ' color:' + ac + '; font-weight:700;' : '');
+    var finalCls = isFinalReached ? ' style="color:' + ac + '; font-weight:700;"' : '';
+    markersHtml = '<span>' + sym + '0</span>' +
+      '<span class="ce-pb-marker-step" style="' + firstStyle + '">' + sym + firstThreshold + '</span>' +
+      '<span' + finalCls + '>' + sym + finalThreshold + '</span>';
   } else {
     var pCls = effectiveTotal >= primaryMax ? ' style="color:' + ac + '; font-weight:700;"' : '';
     markersHtml = '<span>' + sym + '0</span><span' + pCls + '>' + sym + primaryMax + '</span>';
@@ -216,6 +228,7 @@ function renderProgressBar(detail){
   var existingMarkers = mount.querySelector('.ce-pb-markers');
   var existingIcon = mount.querySelector('.ce-pb-icon');
   var existingBadge = mount.querySelector('.ce-pb-gift-pill');
+  var existingTrack = mount.querySelector('.ce-pb-track');
 
   if(existingText && existingFill){
     if(existingText.textContent !== remainingText){
@@ -230,6 +243,20 @@ function renderProgressBar(detail){
     if(existingIcon){
       existingIcon.innerHTML = pbIcon;
       existingIcon.style.setProperty('color', ac, 'important');
+    }
+
+    var existingPoint = existingTrack ? existingTrack.querySelector('.ce-pb-point') : null;
+    if(hasStep){
+      if(!existingPoint && existingTrack){
+        existingPoint = document.createElement('div');
+        existingTrack.appendChild(existingPoint);
+      }
+      if(existingPoint){
+        existingPoint.className = 'ce-pb-point' + (isFirstReached ? ' ce-pb-point-active' : '');
+        existingPoint.style.left = pointPct + '%';
+      }
+    } else if(existingPoint){
+      existingPoint.remove();
     }
 
     var existingCard = mount.querySelector('.ce-progress-bar-card');
@@ -256,6 +283,10 @@ function renderProgressBar(detail){
   }
 
   // Initial card mount
+  var pointHtml = hasStep
+    ? '<div class="ce-pb-point' + (isFirstReached ? ' ce-pb-point-active' : '') + '" style="left:' + pointPct + '%;"></div>'
+    : '';
+
   mount.innerHTML = '<div class="ce-progress-bar-card" style="--ce-accent-color:' + ac + ';">' +
     '<div class="ce-pb-header">' +
       '<div class="ce-pb-icon" style="color:' + ac + ';">' + pbIcon + '</div>' +
@@ -263,6 +294,7 @@ function renderProgressBar(detail){
     '</div>' +
     '<div class="ce-pb-track">' +
       '<div class="ce-pb-fill" style="width:' + pct + '%; background-color:' + ac + ' !important;"></div>' +
+      pointHtml +
     '</div>' +
     '<div class="ce-pb-markers">' + markersHtml + '</div>' +
     giftBadgeHtml +

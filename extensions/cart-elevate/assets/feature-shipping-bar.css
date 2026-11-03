@@ -54,7 +54,7 @@
   background: #ffffff !important;
   border: 1px solid #FCD6CA !important;
   border: 1px solid color-mix(in srgb, var(--ce-accent-color, #F95738) 24%, #ffffff) !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   position: relative !important;
 }
 
@@ -63,15 +63,51 @@
   border-radius: 9999px !important;
   background-color: var(--ce-accent-color, #F95738) !important;
   transition: width 0.35s ease !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.ce-pb-point {
+  position: absolute !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+  background-color: #ffffff !important;
+  border: 2px solid #cbd5e1 !important;
+  border: 2px solid color-mix(in srgb, var(--ce-accent-color, #F95738) 35%, #cbd5e1) !important;
+  box-sizing: border-box !important;
+  z-index: 3 !important;
+  pointer-events: none !important;
+  transition: all 0.3s ease !important;
+}
+
+.ce-pb-point.ce-pb-point-active {
+  background-color: var(--ce-accent-color, #F95738) !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 0 0 1.5px var(--ce-accent-color, #F95738) !important;
 }
 
 .ce-pb-markers {
+  position: relative !important;
   display: flex !important;
   justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
   font-size: 11px !important;
   font-weight: 600 !important;
   color: #94A3B8 !important;
-  margin-top: 4px !important;
+  margin-top: 5px !important;
+  min-height: 16px !important;
+  box-sizing: border-box !important;
+}
+
+.ce-pb-marker-step {
+  position: absolute !important;
+  top: 0 !important;
+  white-space: nowrap !important;
+  text-align: center !important;
 }
 
 .ce-pb-gift-pill {
